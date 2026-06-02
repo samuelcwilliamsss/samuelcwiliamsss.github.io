@@ -446,7 +446,15 @@ async function loadAll() {
     $('bat-updated').textContent = `Last updated: ${ts}`;
     $('pit-updated').textContent = `Last updated: ${ts}`;
 
-    init();
+    try {
+      init();
+    } catch(initErr) {
+      console.error('Init error:', initErr);
+      $('dot').className='dot err';
+      $('stxt').textContent = 'Error during init: ' + initErr.message;
+      $('bat-loader').innerHTML = `<div class="err-box">❌ Data loaded but render failed: ${initErr.message}</div>`;
+      $('pit-loader').innerHTML = `<div class="err-box">❌ ${initErr.message}</div>`;
+    }
   } catch(e) {
     $('dot').className='dot err';
     $('stxt').textContent = 'Error: '+e.message;
@@ -524,7 +532,8 @@ function sby(f){
 function bpg(d){ bPg=Math.max(0,bPg+d); rBat(); }
 function rBat(){
   // If triggered from dropdown, sync bSort/bDir from it
-  const dropVal = $('bsort').value;
+  const dropEl = $('bsort');
+  const dropVal = dropEl ? dropEl.value : bSort;
   if(dropVal !== bSort) {
     bSort = dropVal;
     bDir = BAT_DEFAULT_DIR[bSort] || -1;
@@ -572,7 +581,8 @@ function spy(f){
 function ppg(d){ pPg=Math.max(0,pPg+d); rPit(); }
 function rPit(){
   // If triggered from dropdown, sync pSort/pDir from it
-  const dropVal = $('psort').value;
+  const dropEl = $('psort');
+  const dropVal = dropEl ? dropEl.value : pSort;
   if(dropVal !== pSort) {
     pSort = dropVal;
     pDir = PIT_DEFAULT_DIR[pSort] || -1;
