@@ -32,6 +32,7 @@ label.chk{font-size:12px;color:#555;display:flex;align-items:center;gap:4px;curs
 table{width:100%;font-size:12px;border-collapse:collapse;min-width:600px}
 thead{background:#f9f9f7}
 th{padding:7px 8px;font-size:10.5px;font-weight:700;color:#666;border-bottom:1px solid #e5e5e5;text-align:left;cursor:pointer;white-space:nowrap;user-select:none}
+th:not([onclick]){cursor:default;color:#888}
 th:hover{color:#111;background:#f0f0ec}
 th.s{color:#1d4ed8}
 td{padding:5px 8px;border-bottom:1px solid #f0f0ee;white-space:nowrap}
@@ -110,6 +111,9 @@ tr:hover td{background:#fafaf8}
 .lavg-team-val{font-size:11px;min-width:38px;text-align:right;font-weight:600}
 .lavg-team-val.above{color:#15803d}
 .lavg-team-val.below{color:#dc2626}
+.stat-toggle{font-size:11px;padding:3px 9px;border-radius:6px;border:1px solid #e5e5e5;background:#f9f9f7;color:#666;cursor:pointer;font-weight:500;transition:all .15s}
+.stat-toggle:hover{border-color:#93c5fd;color:#1d4ed8}
+.stat-toggle.active{background:#1d4ed8;color:#fff;border-color:#1d4ed8}
 .pct-badge{display:inline-block;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;vertical-align:middle;letter-spacing:.02em}
 .pct-top{background:#dcfce7;color:#15803d}
 .pct-mid{background:#fef9c3;color:#854d0e}
@@ -218,11 +222,15 @@ tr:hover td{background:#fafaf8}
       <div class="tw"><table>
         <thead><tr>
           <th style="width:26px">#</th><th>Player</th><th>Team</th>
-          <th>App</th><th>GS</th><th>W</th><th>L</th><th>SV</th>
-          <th onclick="spy('IP')">IP</th><th>H</th><th>ER</th>
+          <th onclick="spy('APP')">App</th><th onclick="spy('GS')">GS</th>
+          <th onclick="spy('W')">W</th><th onclick="spy('L')">L</th>
+          <th onclick="spy('SV')">SV</th>
+          <th onclick="spy('IP')">IP</th>
+          <th onclick="spy('H')">H</th><th onclick="spy('ER')">ER</th>
           <th onclick="spy('BB')">BB</th><th onclick="spy('SO')">K</th>
-          <th onclick="spy('ERA')" class="s">ERA</th>
-          <th onclick="spy('WHIP')">WHIP</th><th>BAA</th>
+          <th onclick="spy('ERA')" class="s">ERA ↑</th>
+          <th onclick="spy('WHIP')">WHIP</th>
+          <th onclick="spy('BAA')">BAA</th>
         </tr></thead>
         <tbody id="pbody"></tbody>
       </table></div>
@@ -334,7 +342,10 @@ tr:hover td{background:#fafaf8}
       </div>
     </div>
     <div style="margin-top:1.5rem">
-      <div style="font-size:13px;font-weight:700;color:#333;margin-bottom:.75rem;padding-bottom:.5rem;border-bottom:1px solid #eee">📊 Team batting vs league average</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:.75rem;padding-bottom:.5rem;border-bottom:1px solid #eee">
+        <div style="font-size:13px;font-weight:700;color:#333">📊 All teams vs league average</div>
+        <div style="display:flex;gap:4px;flex-wrap:wrap" id="lavg-stat-btns"></div>
+      </div>
       <div id="lavg-teams"></div>
     </div>
   </div>
@@ -491,10 +502,33 @@ function show(id) {
 }
 
 // ── Batting ──
-function sby(f){ bSort=f; bDir=(f==='SO'?1:-1); bPg=0; rBat(); }
+// Default sort directions: 1 = ascending (low first), -1 = descending (high first)
+const BAT_DEFAULT_DIR = {SO:1, Kpct:1}; // these default low-to-high; everything else high-to-low
+
+function sby(f){
+  if(bSort===f){ bDir*=-1; } // same column → toggle
+  else { bSort=f; bDir=BAT_DEFAULT_DIR[f]||(-1); } // new column → natural direction
+  bPg=0;
+  // Update header arrows
+  document.querySelectorAll('#p-bat th').forEach(th=>{
+    const fn = th.getAttribute('onclick');
+    if(!fn) return;
+    const col = fn.match(/sby\('([^']+)'\)/)?.[1];
+    if(!col) return;
+    th.classList.toggle('s', col===bSort);
+    const base = th.textContent.replace(/[↑↓]/g,'').trim();
+    th.textContent = col===bSort ? base+(bDir===-1?' ↓':' ↑') : base;
+  });
+  rBat();
+}
 function bpg(d){ bPg=Math.max(0,bPg+d); rBat(); }
 function rBat(){
-  bSort = $('bsort').value;
+  // If triggered from dropdown, sync bSort/bDir from it
+  const dropVal = $('bsort').value;
+  if(dropVal !== bSort) {
+    bSort = dropVal;
+    bDir = BAT_DEFAULT_DIR[bSort] || -1;
+  }
   const q=$('bsrch').value.toLowerCase(), tm=$('bteam').value, qual=$('bqual').checked;
   bFil = BAT
     .filter(p => (!qual||flt(p.AB)>=10) && (!tm||p.Team===tm) && (!q||p.Name.toLowerCase().includes(q)))
@@ -517,11 +551,33 @@ function rBat(){
 }
 
 // ── Pitching ──
-function spy(f){ pSort=f; pDir=(f==='ERA'||f==='WHIP')?1:-1; pPg=0; rPit(); }
+// Default sort directions: 1 = ascending (low first = best first for ERA/WHIP etc)
+const PIT_DEFAULT_DIR = {ERA:1, WHIP:1, ERA_n:1, WHIP_n:1, BAA:1, H:1, ER:1, BB:1, L:1};
+
+function spy(f){
+  if(pSort===f){ pDir*=-1; }
+  else { pSort=f; pDir=PIT_DEFAULT_DIR[f]||(-1); }
+  pPg=0;
+  document.querySelectorAll('#p-pit th').forEach(th=>{
+    const fn = th.getAttribute('onclick');
+    if(!fn) return;
+    const col = fn.match(/spy\('([^']+)'\)/)?.[1];
+    if(!col) return;
+    th.classList.toggle('s', col===pSort);
+    const base = th.textContent.replace(/[↑↓]/g,'').trim();
+    th.textContent = col===pSort ? base+(pDir===1?' ↑':' ↓') : base;
+  });
+  rPit();
+}
 function ppg(d){ pPg=Math.max(0,pPg+d); rPit(); }
 function rPit(){
-  pSort = $('psort').value;
-  const asc = pSort==='ERA'||pSort==='WHIP';
+  // If triggered from dropdown, sync pSort/pDir from it
+  const dropVal = $('psort').value;
+  if(dropVal !== pSort) {
+    pSort = dropVal;
+    pDir = PIT_DEFAULT_DIR[pSort] || -1;
+  }
+  const asc = pDir===1;
   const q=$('psrch').value.toLowerCase(), tm=$('pteam').value;
   pFil = PIT
     .filter(p => (!tm||p.Team===tm) && (!q||p.Name.toLowerCase().includes(q)))
@@ -662,27 +718,30 @@ function rTCmp(){
   if(selTeams.length<2){ el.innerHTML=''; return; }
   const tms = selTeams.map(name => TBAT.find(t=>t.Name===name)).filter(Boolean);
   const stats=[
-    {l:'Batting AVG', k:'AVG', f:f3},
-    {l:'On-base %',   k:'OBP', f:f3},
-    {l:'Slugging %',  k:'SLG', f:f3},
-    {l:'OPS',         k:'OPS', f:f3, sc:2},
-    {l:'Runs scored', k:'R',   f:v=>v},
-    {l:'Home runs',   k:'HR',  f:v=>v},
-    {l:'Stolen bases',k:'SB',  f:v=>v},
-    {l:'RBI',         k:'RBI', f:v=>v},
+    {l:'Batting AVG', k:'AVG', f:f3,       lg:()=>lgAvg.AVG},
+    {l:'On-base %',   k:'OBP', f:f3,       lg:()=>lgAvg.OBP},
+    {l:'Slugging %',  k:'SLG', f:f3,       lg:()=>lgAvg.SLG},
+    {l:'OPS',         k:'OPS', f:f3,       lg:()=>lgAvg.OPS},
+    {l:'Runs scored', k:'R',   f:v=>+v,    lg:null},
+    {l:'Home runs',   k:'HR',  f:v=>+v,    lg:null},
+    {l:'Stolen bases',k:'SB',  f:v=>+v,    lg:null},
+    {l:'RBI',         k:'RBI', f:v=>+v,    lg:null},
   ];
   el.innerHTML=`<div class="tc-out">${stats.map(s=>{
     const vals=tms.map(t=>flt(t[s.k]));
-    const mx=s.sc||Math.max(...vals,0.001);
-    return `<div style="margin-bottom:11px">
-      <div class="tstat-lbl">${s.l}</div>
+    const lgVal = s.lg ? s.lg() : null;
+    const mx = Math.max(...vals, lgVal||0, 0.001) * 1.05;
+    const lgPct = lgVal ? Math.round(lgVal/mx*100) : null;
+    return `<div style="margin-bottom:12px">
+      <div class="tstat-lbl">${s.l}${lgVal!=null?` <span style="font-weight:400;color:#aaa">· league avg ${s.f(lgVal)}</span>`:''}</div>
       ${tms.map((t,i)=>{
-        const pct=Math.round(vals[i]/mx*100);
-        const best=vals[i]===Math.max(...vals);
+        const val=vals[i], pct=Math.round(val/mx*100);
+        const best=val===Math.max(...vals);
+        const lgMarker = lgPct!=null ? `<div class="lavg-marker" style="left:${lgPct}%"></div>` : '';
         return `<div class="tbr">
           <span class="tbn" style="color:${TC[i]}">${t.Name}</span>
-          <div class="tbb"><div class="tbf" style="width:${pct}%;background:${TC[i]}"></div></div>
-          <span class="tbv${best?' w':''}">${s.f(vals[i])}</span>
+          <div class="tbb" style="position:relative"><div class="tbf" style="width:${pct}%;background:${TC[i]}"></div>${lgMarker}</div>
+          <span class="tbv${best?' w':''}">${s.f(val)}</span>
         </div>`;}).join('')}
     </div>`;}).join('')}</div>`;
 }
@@ -777,6 +836,21 @@ function rPCmp(){
 }
 
 // ── League averages tab ──
+let lavgStat = 'AVG'; // currently selected team stat
+
+const LAVG_STATS = [
+  {k:'AVG',  l:'AVG',  f:f3,         lg:()=>lgAvg.AVG,  low:false},
+  {k:'OBP',  l:'OBP',  f:f3,         lg:()=>lgAvg.OBP,  low:false},
+  {k:'SLG',  l:'SLG',  f:f3,         lg:()=>lgAvg.SLG,  low:false},
+  {k:'OPS',  l:'OPS',  f:f3,         lg:()=>lgAvg.OPS,  low:false},
+  {k:'R',    l:'R',    f:v=>+v,      lg:null,            low:false},
+  {k:'HR',   l:'HR',   f:v=>+v,      lg:null,            low:false},
+  {k:'RBI',  l:'RBI',  f:v=>+v,      lg:null,            low:false},
+  {k:'SB',   l:'SB',   f:v=>+v,      lg:null,            low:false},
+  {k:'BB',   l:'BB',   f:v=>+v,      lg:null,            low:false},
+  {k:'SO',   l:'SO',   f:v=>+v,      lg:null,            low:true},
+];
+
 function rLAvg() {
   if(!lgAvg.AVG) return;
 
@@ -802,58 +876,61 @@ function rLAvg() {
 
   // Pitching avg card
   const pitStats = [
-    ['ERA',           f2(lgPitAvg.ERA)],
-    ['WHIP',          f2(lgPitAvg.WHIP)],
-    ['Bat avg against', f3(lgPitAvg.BAA)],
-    ['Strikeouts (avg)', lgPitAvg.SO.toFixed(1)],
-    ['Innings pitched (avg)', lgPitAvg.IP.toFixed(1)],
-    ['Walks (avg)',   lgPitAvg.BB.toFixed(1)],
-    ['Wins (avg)',    lgPitAvg.W.toFixed(2)],
-    ['Saves (avg)',   lgPitAvg.SV.toFixed(2)],
-    ['Earned runs (avg)', lgPitAvg.ER.toFixed(1)],
-    ['Hits allowed (avg)', lgPitAvg.H.toFixed(1)],
+    ['ERA',                 f2(lgPitAvg.ERA)],
+    ['WHIP',                f2(lgPitAvg.WHIP)],
+    ['Bat avg against',     f3(lgPitAvg.BAA)],
+    ['Strikeouts (avg)',    lgPitAvg.SO.toFixed(1)],
+    ['Innings pitched (avg)',lgPitAvg.IP.toFixed(1)],
+    ['Walks (avg)',         lgPitAvg.BB.toFixed(1)],
+    ['Wins (avg)',          lgPitAvg.W.toFixed(2)],
+    ['Saves (avg)',         lgPitAvg.SV.toFixed(2)],
+    ['Earned runs (avg)',   lgPitAvg.ER.toFixed(1)],
+    ['Hits allowed (avg)',  lgPitAvg.H.toFixed(1)],
   ];
   $('lavg-pit').innerHTML = `<div style="font-size:11px;color:#aaa;margin-bottom:8px">Based on ${lgPitAvg._n} pitchers</div>` +
     pitStats.map(([l,v]) => `<div class="lavg-row"><span class="lavg-label">${l}</span><span class="lavg-val">${v}</span></div>`).join('');
 
-  // Team batting vs league avg
-  const lgAVG = lgAvg.AVG, lgOPS = lgAvg.OPS;
-  const maxAVG = Math.max(...TBAT.map(t=>flt(t.AVG)), lgAVG) * 1.1;
-  $('lavg-teams').innerHTML = `
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem">
-      <div>
-        <div class="tstat-lbl" style="margin-bottom:8px">Team AVG vs league avg (${f3(lgAVG)})</div>
-        ${TBAT.sort((a,b)=>flt(b.AVG)-flt(a.AVG)).map(t => {
-          const val = flt(t.AVG), pct = Math.round(val/maxAVG*100);
-          const lgPct = Math.round(lgAVG/maxAVG*100);
-          const above = val >= lgAVG;
-          return `<div class="lavg-team-row">
-            <span class="lavg-team-name">${t.Name}</span>
-            <div class="lavg-bar-bg">
-              <div class="lavg-bar-fill" style="width:${pct}%;background:${above?'#16a34a':'#dc2626'}88"></div>
-              <div class="lavg-marker" style="left:${lgPct}%"></div>
-            </div>
-            <span class="lavg-team-val ${above?'above':'below'}">${f3(val)}</span>
-          </div>`;}).join('')}
+  // Build toggle buttons
+  $('lavg-stat-btns').innerHTML = LAVG_STATS.map(s =>
+    `<button class="stat-toggle${lavgStat===s.k?' active':''}" onclick="setLavgStat('${s.k}')">${s.l}</button>`
+  ).join('');
+
+  rLAvgTeams();
+}
+
+function setLavgStat(k) {
+  lavgStat = k;
+  // Update button states
+  document.querySelectorAll('.stat-toggle').forEach(b => b.classList.toggle('active', b.textContent===k));
+  rLAvgTeams();
+}
+
+function rLAvgTeams() {
+  const s = LAVG_STATS.find(x=>x.k===lavgStat);
+  if(!s || !TBAT.length) return;
+  const lgVal = s.lg ? s.lg() : null;
+  const sorted = TBAT.slice().sort((a,b) => s.low ? flt(a[s.k])-flt(b[s.k]) : flt(b[s.k])-flt(a[s.k]));
+  const mx = Math.max(...sorted.map(t=>flt(t[s.k])), lgVal||0, 0.001) * 1.05;
+  const lgPct = lgVal!=null ? Math.round(lgVal/mx*100) : null;
+
+  $('lavg-teams').innerHTML = sorted.map(t => {
+    const val = flt(t[s.k]);
+    const pct = Math.round(val/mx*100);
+    const above = lgVal!=null ? (s.low ? val<=lgVal : val>=lgVal) : true;
+    const lgMarker = lgPct!=null ? `<div class="lavg-marker" style="left:${lgPct}%"></div>` : '';
+    return `<div class="lavg-team-row">
+      <span class="lavg-team-name">${t.Name}</span>
+      <div class="lavg-bar-bg">
+        <div class="lavg-bar-fill" style="width:${pct}%;background:${above?'#16a34a':'#dc2626'}88"></div>
+        ${lgMarker}
       </div>
-      <div>
-        <div class="tstat-lbl" style="margin-bottom:8px">Team OPS vs league avg (${f3(lgOPS)})</div>
-        ${TBAT.sort((a,b)=>flt(b.OPS)-flt(a.OPS)).map(t => {
-          const val = flt(t.OPS);
-          const maxOPS = Math.max(...TBAT.map(t=>flt(t.OPS)), lgOPS) * 1.1;
-          const pct = Math.round(val/maxOPS*100);
-          const lgPct = Math.round(lgOPS/maxOPS*100);
-          const above = val >= lgOPS;
-          return `<div class="lavg-team-row">
-            <span class="lavg-team-name">${t.Name}</span>
-            <div class="lavg-bar-bg">
-              <div class="lavg-bar-fill" style="width:${pct}%;background:${above?'#16a34a':'#dc2626'}88"></div>
-              <div class="lavg-marker" style="left:${lgPct}%"></div>
-            </div>
-            <span class="lavg-team-val ${above?'above':'below'}">${f3(val)}</span>
-          </div>`;}).join('')}
-      </div>
+      <span class="lavg-team-val ${lgVal!=null?(above?'above':'below'):''}">${s.f(val)}</span>
     </div>`;
+  }).join('') + (lgVal!=null ? `<div style="font-size:11px;color:#888;margin-top:8px;display:flex;align-items:center;gap:6px">
+    <div style="width:16px;height:2px;background:#1a1a1a;opacity:.4;display:inline-block"></div>
+    League average: <strong>${s.f(lgVal)}</strong>
+  </div>` : '');
+}
 }
 
 // ── Player card modal ──
