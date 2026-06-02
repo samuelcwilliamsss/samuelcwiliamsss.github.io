@@ -170,21 +170,12 @@ tr:hover td{background:#fafaf8}
       <div class="ctrl">
         <input type="text" id="bsrch" placeholder="Search player…" oninput="rBat()">
         <select id="bteam" onchange="rBat()"><option value="">All teams</option></select>
-        <select id="bsort" onchange="rBat()">
-          <option value="AVG">Sort: AVG</option><option value="OPS">OPS</option>
-          <option value="OBP">OBP</option><option value="SLG">SLG</option>
-          <option value="H">Hits</option><option value="RBI">RBI</option>
-          <option value="HR">HR</option><option value="SB">SB</option>
-          <option value="R">Runs</option><option value="AB">AB</option>
-          <option value="SO">SO</option><option value="BB">BB</option>
-          <option value="BBpct">BB%</option><option value="Kpct">K%</option>
-        </select>
         <label class="chk"><input type="checkbox" id="bqual" checked onchange="rBat()"> Min 10 AB</label>
         <span id="bcount" style="font-size:12px;color:#888"></span>
       </div>
       <div class="tw"><table>
         <thead><tr>
-          <th style="width:26px">#</th><th>Player</th><th>Team</th>
+          <th style="width:26px">#</th><th>Player</th><th style="cursor:default">Team</th>
           <th onclick="sby('G')">G</th><th onclick="sby('AB')">AB</th>
           <th onclick="sby('R')">R</th><th onclick="sby('H')">H</th>
           <th onclick="sby('2B')">2B</th><th onclick="sby('3B')">3B</th>
@@ -213,10 +204,6 @@ tr:hover td{background:#fafaf8}
       <div class="ctrl">
         <input type="text" id="psrch" placeholder="Search pitcher…" oninput="rPit()">
         <select id="pteam" onchange="rPit()"><option value="">All teams</option></select>
-        <select id="psort" onchange="rPit()">
-          <option value="ERA">Sort: ERA</option><option value="SO">K</option>
-          <option value="IP">IP</option><option value="W">W</option><option value="WHIP">WHIP</option>
-        </select>
         <span id="pcount" style="font-size:12px;color:#888"></span>
       </div>
       <div class="tw"><table>
@@ -531,13 +518,6 @@ function sby(f){
 }
 function bpg(d){ bPg=Math.max(0,bPg+d); rBat(); }
 function rBat(){
-  // If triggered from dropdown, sync bSort/bDir from it
-  const dropEl = $('bsort');
-  const dropVal = dropEl ? dropEl.value : bSort;
-  if(dropVal !== bSort) {
-    bSort = dropVal;
-    bDir = BAT_DEFAULT_DIR[bSort] || -1;
-  }
   const q=$('bsrch').value.toLowerCase(), tm=$('bteam').value, qual=$('bqual').checked;
   bFil = BAT
     .filter(p => (!qual||flt(p.AB)>=10) && (!tm||p.Team===tm) && (!q||p.Name.toLowerCase().includes(q)))
@@ -580,13 +560,6 @@ function spy(f){
 }
 function ppg(d){ pPg=Math.max(0,pPg+d); rPit(); }
 function rPit(){
-  // If triggered from dropdown, sync pSort/pDir from it
-  const dropEl = $('psort');
-  const dropVal = dropEl ? dropEl.value : pSort;
-  if(dropVal !== pSort) {
-    pSort = dropVal;
-    pDir = PIT_DEFAULT_DIR[pSort] || -1;
-  }
   const asc = pDir===1;
   const q=$('psrch').value.toLowerCase(), tm=$('pteam').value;
   pFil = PIT
