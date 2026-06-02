@@ -67,12 +67,13 @@ tr:hover td{background:#fafaf8}
 .bars-wrap{border:1px solid #e5e5e5;border-radius:10px;padding:1rem;background:#fafaf8;margin-top:.5rem}
 .bars-legend{display:flex;gap:14px;font-size:11px;color:#666;margin-bottom:10px;font-weight:500}
 .lsq{width:10px;height:10px;border-radius:2px;display:inline-block;margin-right:3px;vertical-align:middle}
-.brow{display:grid;grid-template-columns:1fr 72px 1fr;align-items:center;gap:5px;margin-bottom:7px}
-.blbl{font-size:10px;text-align:center;color:#999;font-weight:700}
-.bwrap{height:17px;background:#eee;border-radius:3px;overflow:hidden}
+.brow{display:grid;grid-template-columns:52px 1fr 80px 1fr 52px;align-items:center;gap:4px;margin-bottom:7px}
+.blbl{font-size:10px;text-align:center;color:#999;font-weight:700;line-height:1.3}
+.bwrap{height:17px;background:#eee;border-radius:3px;overflow:hidden;position:relative}
 .bleft .bf{height:100%;background:#3b82f6;border-radius:3px;float:right;transition:width .4s}
 .bright .bf{height:100%;background:#f97316;border-radius:3px;transition:width .4s}
-.bv{font-size:11px;font-weight:600;min-width:38px}
+.bv{font-size:11px;font-weight:600;text-align:right}
+.bv.right{text-align:left}
 .bv.w{color:#15803d;font-weight:800}
 .bv.wbad{color:#dc2626;font-weight:800}
 
@@ -83,7 +84,7 @@ tr:hover td{background:#fafaf8}
 .tc-out{border:1px solid #e5e5e5;border-radius:10px;padding:1rem;background:#fafaf8;margin-bottom:1rem}
 .tstat-lbl{font-size:10px;font-weight:700;color:#999;text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px}
 .tbr{display:flex;align-items:center;gap:8px;margin-bottom:4px}
-.tbn{font-size:11px;font-weight:700;min-width:36px}
+.tbn{font-size:11px;font-weight:700;min-width:48px;flex-shrink:0}
 .tbb{flex:1;height:15px;border-radius:3px;background:#eee;overflow:hidden}
 .tbf{height:100%;border-radius:3px;transition:width .4s}
 .tbv{font-size:11px;min-width:44px;text-align:right}
@@ -102,7 +103,7 @@ tr:hover td{background:#fafaf8}
 .lavg-val{font-weight:700;font-size:14px;color:#1a1a1a}
 .lavg-sub{font-size:10px;color:#aaa;margin-top:1px}
 .lavg-team-row{display:flex;align-items:center;gap:8px;margin-bottom:5px;font-size:12px}
-.lavg-team-name{min-width:40px;font-weight:700;font-size:11px}
+.lavg-team-name{min-width:48px;font-weight:700;font-size:11px;flex-shrink:0}
 .lavg-bar-bg{flex:1;height:14px;border-radius:3px;background:#eee;overflow:hidden;position:relative}
 .lavg-bar-fill{height:100%;border-radius:3px;transition:width .4s}
 .lavg-marker{position:absolute;top:0;bottom:0;width:2px;background:#1a1a1a;opacity:.4}
@@ -511,7 +512,7 @@ function rBat(){
     <td>${p.SB}</td><td>${p.BB}</td><td>${p.SO}</td>
     <td>${fpct(p.BBpct)}</td><td>${fpct(p.Kpct)}</td>
     <td class="hl">${f3(p.AVG)}</td><td>${f3(p.OBP)}</td><td>${f3(p.SLG)}</td><td>${f3(p.OPS)}</td>
-    <td><button class="addbtn" onclick='addCmp(${JSON.stringify({Name:p.Name,Team:p.Team,AVG:p.AVG,OBP:p.OBP,SLG:p.SLG,OPS:p.OPS,H:p.H,HR:p.HR,RBI:p.RBI,R:p.R,SB:p.SB,BB:p.BB,SO:p.SO,AB:p.AB})});show("cmp")'>+ Compare</button></td>
+    <td><button class="addbtn" onclick='addCmp(${JSON.stringify({Name:p.Name,Team:p.Team,AVG:p.AVG,OBP:p.OBP,SLG:p.SLG,OPS:p.OPS,H:p.H,HR:p.HR,RBI:p.RBI,R:p.R,SB:p.SB,BB:p.BB,SO:p.SO,AB:p.AB,BBpct:p.BBpct,Kpct:p.Kpct})});show("cmp")'>+ Compare</button></td>
   </tr>`).join('');
 }
 
@@ -541,6 +542,28 @@ function rPit(){
   </tr>`).join('');
 }
 
+// Shared bar row renderer for compare panels
+function barRow(s) {
+  const mx = s.sc || Math.max(s.a, s.b, s.lg!=null?s.lg:0, 0.001);
+  const pA = Math.round(s.a/mx*100), pB = Math.round(s.b/mx*100);
+  const pLg = s.lg!=null ? Math.round(s.lg/mx*100) : null;
+  const aw = s.low ? s.a<s.b : s.a>s.b;
+  const bw = s.low ? s.b<s.a : s.b>s.a;
+  const aValCls = aw ? ' w' : (bw ? ' wbad' : '');
+  const bValCls = bw ? ' w' : (aw ? ' wbad' : '');
+  const barColA = s.low ? '#f97316' : '#3b82f6';
+  const barColB = s.low ? '#3b82f6' : '#f97316';
+  const lgMarker = pLg!=null ? `<div class="lavg-marker" style="left:${pLg}%"></div>` : '';
+  const lgLabel = pLg!=null ? `<br><span style="color:#aaa;font-weight:400;font-size:9px">${s.f(s.lg)}</span>` : '';
+  return `<div class="brow">
+    <span class="bv${aValCls}">${s.f(s.a)}</span>
+    <div class="bwrap bleft" style="position:relative"><div class="bf" style="width:${pA}%;background:${barColA}"></div>${lgMarker}</div>
+    <div class="blbl">${s.l}${lgLabel}</div>
+    <div class="bwrap bright" style="position:relative"><div class="bf" style="width:${pB}%;background:${barColB}"></div>${lgMarker}</div>
+    <span class="bv right${bValCls}">${s.f(s.b)}</span>
+  </div>`;
+}
+
 // ── Compare players ──
 function addCmp(pl){
   if(!slA){ slA=pl; }
@@ -566,8 +589,7 @@ function rSlots(){
       ['SLG', f3(pl.SLG),      batPct('SLG')],
       ['OPS', f3(pl.OPS),      batPct('OPS')],
       ['BB%', fpct(pl.BBpct),  batPct('BBpct')],
-      ['K%',  fpct(pl.Kpct),   batPct('Kpct', true)],
-      ['RBI', pl.RBI,          batPct('RBI')],
+      ['K%',  fpct(pl.Kpct),   batPct('Kpct', true)],      ['RBI', pl.RBI,          batPct('RBI')],
       ['HR',  pl.HR,           batPct('HR')],
       ['SB',  pl.SB,           batPct('SB')],
     ].map(([l,v,b])=>`<div class="sg-cell"><div class="l">${l}</div><div class="v">${v}${b||''}</div></div>`).join('')}</div>`;
@@ -592,37 +614,14 @@ function rSlots(){
     {l:'SLG',  a:flt(slA.SLG),   b:flt(slB.SLG),   lg:lgAvg.SLG,   f:f3},
     {l:'OPS',  a:flt(slA.OPS),   b:flt(slB.OPS),   lg:lgAvg.OPS,   f:f3, sc:2},
     {l:'BB%',  a:flt(slA.BBpct), b:flt(slB.BBpct), lg:lgAvg.BBpct, f:fpct, sc:50},
-    {l:'K%',   a:flt(slA.Kpct),  b:flt(slB.Kpct),  lg:lgAvg.Kpct,  f:fpct, sc:100, low:true},
-    {l:'H',    a:flt(slA.H),     b:flt(slB.H),     lg:lgAvg.H,     f:v=>Math.round(v)},
+    {l:'K%',   a:flt(slA.Kpct),  b:flt(slB.Kpct),  lg:lgAvg.Kpct,  f:fpct, sc:100, low:true},    {l:'H',    a:flt(slA.H),     b:flt(slB.H),     lg:lgAvg.H,     f:v=>Math.round(v)},
     {l:'HR',   a:flt(slA.HR),    b:flt(slB.HR),    lg:lgAvg.HR,    f:v=>Math.round(v)},
     {l:'RBI',  a:flt(slA.RBI),   b:flt(slB.RBI),   lg:lgAvg.RBI,   f:v=>Math.round(v)},
     {l:'R',    a:flt(slA.R),     b:flt(slB.R),     lg:lgAvg.R,     f:v=>Math.round(v)},
     {l:'SB',   a:flt(slA.SB),    b:flt(slB.SB),    lg:lgAvg.SB,    f:v=>Math.round(v)},
     {l:'SO',   a:flt(slA.SO),    b:flt(slB.SO),    lg:lgAvg.SO,    f:v=>Math.round(v), low:true},
   ];
-  $('barcont').innerHTML = stats.map(s => {
-    const mx = s.sc || Math.max(s.a, s.b, s.lg||0, 0.001);
-    const pA = Math.round(s.a/mx*100), pB = Math.round(s.b/mx*100);
-    const pLg = s.lg ? Math.round(s.lg/mx*100) : null;
-    const aw = s.low ? s.a<s.b : s.a>s.b;
-    const bw = s.low ? s.b<s.a : s.b>s.a;
-    const aValCls = aw ? ' w' : (bw ? ' wbad' : '');
-    const bValCls = bw ? ' w' : (aw ? ' wbad' : '');
-    const barColA = s.low ? '#f97316' : '#3b82f6';
-    const barColB = s.low ? '#3b82f6' : '#f97316';
-    const lgMarker = pLg !== null ? `<div class="lavg-marker" style="left:${pLg}%"></div>` : '';
-    return `<div class="brow">
-      <div style="display:flex;align-items:center;gap:4px">
-        <span class="bv${aValCls}" style="text-align:right;min-width:38px">${s.f(s.a)}</span>
-        <div class="bwrap bleft" style="flex:1;position:relative"><div class="bf" style="width:${pA}%;background:${barColA}"></div>${lgMarker}</div>
-      </div>
-      <div class="blbl">${s.l}${pLg!==null?`<br><span style="color:#aaa;font-weight:400">${typeof s.lg==='number'?s.f(s.lg):''}</span>`:''}</div>
-      <div style="display:flex;align-items:center;gap:4px">
-        <div class="bwrap bright" style="flex:1;position:relative"><div class="bf" style="width:${pB}%;background:${barColB}"></div>${lgMarker}</div>
-        <span class="bv${bValCls}" style="min-width:38px">${s.f(s.b)}</span>
-      </div>
-    </div>`;
-  }).join('');
+  $('barcont').innerHTML = stats.map(s => barRow(s)).join('');
 }
 
 function cpg(d){ cPg=Math.max(0,cPg+d); rCmp(); }
@@ -638,7 +637,7 @@ function rCmp(){
     <td>${p.AB}</td>
     <td class="hl">${f3(p.AVG)}</td><td>${f3(p.OBP)}</td><td>${f3(p.SLG)}</td><td>${f3(p.OPS)}</td>
     <td>${p.RBI}</td><td>${p.SB}</td><td>${p.HR}</td>
-    <td><button class="addbtn" onclick='addCmp(${JSON.stringify({Name:p.Name,Team:p.Team,AVG:p.AVG,OBP:p.OBP,SLG:p.SLG,OPS:p.OPS,H:p.H,HR:p.HR,RBI:p.RBI,R:p.R,SB:p.SB,BB:p.BB,SO:p.SO,AB:p.AB})})'>+ Add</button></td>
+    <td><button class="addbtn" onclick='addCmp(${JSON.stringify({Name:p.Name,Team:p.Team,AVG:p.AVG,OBP:p.OBP,SLG:p.SLG,OPS:p.OPS,H:p.H,HR:p.HR,RBI:p.RBI,R:p.R,SB:p.SB,BB:p.BB,SO:p.SO,AB:p.AB,BBpct:p.BBpct,Kpct:p.Kpct})})'>+ Add</button></td>
   </tr>`).join('');
 }
 
@@ -757,29 +756,7 @@ function rPSlots(){
     {l:'ER',   a:flt(pslA.ER),   b:flt(pslB.ER),   lg:lgPitAvg.ER,   f:v=>Math.round(v), low:true},
     {l:'H',    a:flt(pslA.H),    b:flt(pslB.H),    lg:lgPitAvg.H,    f:v=>Math.round(v), low:true},
   ];
-  $('pbarcont').innerHTML = stats.map(s => {
-    const mx = s.sc || Math.max(s.a, s.b, s.lg||0, 0.001);
-    const pA = Math.round(s.a/mx*100), pB = Math.round(s.b/mx*100);
-    const pLg = s.lg ? Math.round(s.lg/mx*100) : null;
-    const aw = s.low ? s.a<s.b : s.a>s.b;
-    const bw = s.low ? s.b<s.a : s.b>s.a;
-    const aValCls = aw ? ' w' : (bw ? ' wbad' : '');
-    const bValCls = bw ? ' w' : (aw ? ' wbad' : '');
-    const barColA = s.low ? '#f97316' : '#3b82f6';
-    const barColB = s.low ? '#3b82f6' : '#f97316';
-    const lgMarker = pLg !== null ? `<div class="lavg-marker" style="left:${pLg}%"></div>` : '';
-    return `<div class="brow">
-      <div style="display:flex;align-items:center;gap:4px">
-        <span class="bv${aValCls}" style="text-align:right;min-width:38px">${s.f(s.a)}</span>
-        <div class="bwrap bleft" style="flex:1;position:relative"><div class="bf" style="width:${pA}%;background:${barColA}"></div>${lgMarker}</div>
-      </div>
-      <div class="blbl">${s.l}${pLg!==null?`<br><span style="color:#aaa;font-weight:400">${s.f(s.lg)}</span>`:''}</div>
-      <div style="display:flex;align-items:center;gap:4px">
-        <div class="bwrap bright" style="flex:1;position:relative"><div class="bf" style="width:${pB}%;background:${barColB}"></div>${lgMarker}</div>
-        <span class="bv${bValCls}" style="min-width:38px">${s.f(s.b)}</span>
-      </div>
-    </div>`;
-  }).join('');
+  $('pbarcont').innerHTML = stats.map(s => barRow(s)).join('');
 }
 function pcpg(d){ pcPg=Math.max(0,pcPg+d); rPCmp(); }
 function rPCmp(){
@@ -900,7 +877,7 @@ function openBatCard(p) {
         <div class="modal-stat"><div class="modal-stat-label">${l}</div><div class="modal-stat-val">${v}${b}</div></div>`).join('')}
     </div>`;
   $('modal-actions').innerHTML = `
-    <button class="modal-btn modal-btn-cmp" onclick='addCmp(${JSON.stringify({Name:p.Name,Team:p.Team,AVG:p.AVG,OBP:p.OBP,SLG:p.SLG,OPS:p.OPS,H:p.H,HR:p.HR,RBI:p.RBI,R:p.R,SB:p.SB,BB:p.BB,SO:p.SO,AB:p.AB})});show("cmp");closeModal()'>+ Add to compare</button>
+    <button class="modal-btn modal-btn-cmp" onclick='addCmp(${JSON.stringify({Name:p.Name,Team:p.Team,AVG:p.AVG,OBP:p.OBP,SLG:p.SLG,OPS:p.OPS,H:p.H,HR:p.HR,RBI:p.RBI,R:p.R,SB:p.SB,BB:p.BB,SO:p.SO,AB:p.AB,BBpct:p.BBpct,Kpct:p.Kpct})});show("cmp");closeModal()'>+ Add to compare</button>
     <button class="modal-btn" style="background:#f9f9f7;color:#666;border-color:#e5e5e5" onclick="closeModal()">Close</button>`;
   $('modal').style.display='flex';
   document.body.style.overflow='hidden';
