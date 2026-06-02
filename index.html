@@ -172,6 +172,7 @@ tr:hover td{background:#fafaf8}
           <option value="HR">HR</option><option value="SB">SB</option>
           <option value="R">Runs</option><option value="AB">AB</option>
           <option value="SO">SO</option><option value="BB">BB</option>
+          <option value="BBpct">BB%</option><option value="Kpct">K%</option>
         </select>
         <label class="chk"><input type="checkbox" id="bqual" checked onchange="rBat()"> Min 10 AB</label>
         <span id="bcount" style="font-size:12px;color:#888"></span>
@@ -185,6 +186,8 @@ tr:hover td{background:#fafaf8}
           <th onclick="sby('HR')">HR</th><th onclick="sby('RBI')">RBI</th>
           <th onclick="sby('SB')">SB</th><th onclick="sby('BB')">BB</th>
           <th onclick="sby('SO')">SO</th>
+          <th onclick="sby('BBpct')">BB%</th>
+          <th onclick="sby('Kpct')">K%</th>
           <th onclick="sby('AVG')" class="s">AVG</th>
           <th onclick="sby('OBP')">OBP</th>
           <th onclick="sby('SLG')">SLG</th>
@@ -366,6 +369,7 @@ const $ = id => document.getElementById(id);
 const flt = v => parseFloat(v)||0;
 const f3 = v => { const n=parseFloat(v); return isNaN(n)?'-':n.toFixed(3); };
 const f2 = v => { const n=parseFloat(v); return isNaN(n)?'-':n.toFixed(2); };
+const fpct = v => { const n=parseFloat(v); return isNaN(n)?'-':n.toFixed(1)+'%'; };
 
 // Compute percentile rank of val in array of values (higher = better by default, low=true flips it)
 function pctRank(val, arr, low=false) {
@@ -448,11 +452,18 @@ function init() {
 
   // Compute league batting averages (qualified batters, min 10 AB)
   const qual = BAT.filter(p => flt(p.AB) >= 10);
+  // Add computed BB% and K% to every batter
+  BAT.forEach(p => {
+    const pa = flt(p.AB) + flt(p.BB) + flt(p.HBP);
+    p.BBpct = pa > 0 ? (flt(p.BB) / pa) * 100 : 0;
+    p.Kpct  = pa > 0 ? (flt(p.SO) / pa) * 100 : 0;
+  });
   const avg = f => qual.reduce((s,p)=>s+flt(p[f]),0) / Math.max(qual.length,1);
   lgAvg = {
     AVG: avg('AVG'), OBP: avg('OBP'), SLG: avg('SLG'), OPS: avg('OPS'),
     H:   avg('H'),   HR:  avg('HR'),  RBI: avg('RBI'), R:   avg('R'),
     SB:  avg('SB'),  BB:  avg('BB'),  SO:  avg('SO'),  AB:  avg('AB'),
+    BBpct: avg('BBpct'), Kpct: avg('Kpct'),
     _n: qual.length
   };
 
@@ -498,6 +509,7 @@ function rBat(){
     <td>${p.G}</td><td>${p.AB}</td><td>${p.R}</td><td>${p.H}</td>
     <td>${p['2B']}</td><td>${p['3B']}</td><td>${p.HR}</td><td>${p.RBI}</td>
     <td>${p.SB}</td><td>${p.BB}</td><td>${p.SO}</td>
+    <td>${fpct(p.BBpct)}</td><td>${fpct(p.Kpct)}</td>
     <td class="hl">${f3(p.AVG)}</td><td>${f3(p.OBP)}</td><td>${f3(p.SLG)}</td><td>${f3(p.OPS)}</td>
     <td><button class="addbtn" onclick='addCmp(${JSON.stringify({Name:p.Name,Team:p.Team,AVG:p.AVG,OBP:p.OBP,SLG:p.SLG,OPS:p.OPS,H:p.H,HR:p.HR,RBI:p.RBI,R:p.R,SB:p.SB,BB:p.BB,SO:p.SO,AB:p.AB})});show("cmp")'>+ Compare</button></td>
   </tr>`).join('');
@@ -549,15 +561,15 @@ function rSlots(){
     const batPct = (field, low=false) => pctBadge(pctRank(pl[field], qual.map(p=>p[field]), low));
     cont.innerHTML = `<div class="slot-name">${pl.Name}</div><div class="slot-team">${pl.Team}</div>
     <div class="sg">${[
-      ['AVG', f3(pl.AVG),  batPct('AVG')],
-      ['OBP', f3(pl.OBP),  batPct('OBP')],
-      ['SLG', f3(pl.SLG),  batPct('SLG')],
-      ['OPS', f3(pl.OPS),  batPct('OPS')],
-      ['RBI', pl.RBI,       batPct('RBI')],
-      ['HR',  pl.HR,        batPct('HR')],
-      ['SB',  pl.SB,        batPct('SB')],
-      ['R',   pl.R,         batPct('R')],
-      ['SO',  pl.SO,        batPct('SO', true)],
+      ['AVG', f3(pl.AVG),      batPct('AVG')],
+      ['OBP', f3(pl.OBP),      batPct('OBP')],
+      ['SLG', f3(pl.SLG),      batPct('SLG')],
+      ['OPS', f3(pl.OPS),      batPct('OPS')],
+      ['BB%', fpct(pl.BBpct),  batPct('BBpct')],
+      ['K%',  fpct(pl.Kpct),   batPct('Kpct', true)],
+      ['RBI', pl.RBI,          batPct('RBI')],
+      ['HR',  pl.HR,           batPct('HR')],
+      ['SB',  pl.SB,           batPct('SB')],
     ].map(([l,v,b])=>`<div class="sg-cell"><div class="l">${l}</div><div class="v">${v}${b||''}</div></div>`).join('')}</div>`;
   };
   render(slA,'slotA','slotAc'); render(slB,'slotB','slotBc');
@@ -566,7 +578,7 @@ function rSlots(){
   const lgc = $('slotLgc');
   if(lgc && lgAvg.AVG) {
     lgc.innerHTML = `<div class="slot-name" style="color:#666;font-size:13px">Division 5</div><div class="slot-team">${lgAvg._n} qualified batters</div>
-    <div class="sg">${[['AVG',f3(lgAvg.AVG)],['OBP',f3(lgAvg.OBP)],['SLG',f3(lgAvg.SLG)],['OPS',f3(lgAvg.OPS)],['RBI',lgAvg.RBI.toFixed(1)],['HR',lgAvg.HR.toFixed(2)],['SB',lgAvg.SB.toFixed(1)],['R',lgAvg.R.toFixed(1)],['AB',lgAvg.AB.toFixed(1)]].map(([l,v])=>`<div class="sg-cell"><div class="l">${l}</div><div class="v" style="color:#888">${v}</div></div>`).join('')}</div>`;
+    <div class="sg">${[['AVG',f3(lgAvg.AVG)],['OBP',f3(lgAvg.OBP)],['SLG',f3(lgAvg.SLG)],['OPS',f3(lgAvg.OPS)],['BB%',fpct(lgAvg.BBpct)],['K%',fpct(lgAvg.Kpct)],['RBI',lgAvg.RBI.toFixed(1)],['HR',lgAvg.HR.toFixed(2)],['SB',lgAvg.SB.toFixed(1)]].map(([l,v])=>`<div class="sg-cell"><div class="l">${l}</div><div class="v" style="color:#888">${v}</div></div>`).join('')}</div>`;
   }
 
   if(!slA||!slB){ $('barsec').style.display='none'; return; }
@@ -575,17 +587,18 @@ function rSlots(){
   $('legB').textContent = slB.Name+' ('+slB.Team+')';
   const f1 = v => parseFloat(v).toFixed(1);
   const stats = [
-    {l:'AVG',  a:flt(slA.AVG), b:flt(slB.AVG), lg:lgAvg.AVG, f:f3},
-    {l:'OBP',  a:flt(slA.OBP), b:flt(slB.OBP), lg:lgAvg.OBP, f:f3},
-    {l:'SLG',  a:flt(slA.SLG), b:flt(slB.SLG), lg:lgAvg.SLG, f:f3},
-    {l:'OPS',  a:flt(slA.OPS), b:flt(slB.OPS), lg:lgAvg.OPS, f:f3, sc:2},
-    {l:'H',    a:flt(slA.H),   b:flt(slB.H),   lg:lgAvg.H,   f:v=>Math.round(v)},
-    {l:'HR',   a:flt(slA.HR),  b:flt(slB.HR),  lg:lgAvg.HR,  f:v=>Math.round(v)},
-    {l:'RBI',  a:flt(slA.RBI), b:flt(slB.RBI), lg:lgAvg.RBI, f:v=>Math.round(v)},
-    {l:'R',    a:flt(slA.R),   b:flt(slB.R),   lg:lgAvg.R,   f:v=>Math.round(v)},
-    {l:'SB',   a:flt(slA.SB),  b:flt(slB.SB),  lg:lgAvg.SB,  f:v=>Math.round(v)},
-    {l:'BB',   a:flt(slA.BB),  b:flt(slB.BB),  lg:lgAvg.BB,  f:v=>Math.round(v)},
-    {l:'SO',   a:flt(slA.SO),  b:flt(slB.SO),  lg:lgAvg.SO,  f:v=>Math.round(v), low:true},
+    {l:'AVG',  a:flt(slA.AVG),   b:flt(slB.AVG),   lg:lgAvg.AVG,   f:f3},
+    {l:'OBP',  a:flt(slA.OBP),   b:flt(slB.OBP),   lg:lgAvg.OBP,   f:f3},
+    {l:'SLG',  a:flt(slA.SLG),   b:flt(slB.SLG),   lg:lgAvg.SLG,   f:f3},
+    {l:'OPS',  a:flt(slA.OPS),   b:flt(slB.OPS),   lg:lgAvg.OPS,   f:f3, sc:2},
+    {l:'BB%',  a:flt(slA.BBpct), b:flt(slB.BBpct), lg:lgAvg.BBpct, f:fpct, sc:50},
+    {l:'K%',   a:flt(slA.Kpct),  b:flt(slB.Kpct),  lg:lgAvg.Kpct,  f:fpct, sc:100, low:true},
+    {l:'H',    a:flt(slA.H),     b:flt(slB.H),     lg:lgAvg.H,     f:v=>Math.round(v)},
+    {l:'HR',   a:flt(slA.HR),    b:flt(slB.HR),    lg:lgAvg.HR,    f:v=>Math.round(v)},
+    {l:'RBI',  a:flt(slA.RBI),   b:flt(slB.RBI),   lg:lgAvg.RBI,   f:v=>Math.round(v)},
+    {l:'R',    a:flt(slA.R),     b:flt(slB.R),     lg:lgAvg.R,     f:v=>Math.round(v)},
+    {l:'SB',   a:flt(slA.SB),    b:flt(slB.SB),    lg:lgAvg.SB,    f:v=>Math.round(v)},
+    {l:'SO',   a:flt(slA.SO),    b:flt(slB.SO),    lg:lgAvg.SO,    f:v=>Math.round(v), low:true},
   ];
   $('barcont').innerHTML = stats.map(s => {
     const mx = s.sc || Math.max(s.a, s.b, s.lg||0, 0.001);
@@ -796,6 +809,8 @@ function rLAvg() {
     ['On-base %',          f3(lgAvg.OBP)],
     ['Slugging %',         f3(lgAvg.SLG)],
     ['OPS',                f3(lgAvg.OPS)],
+    ['Walk rate (BB%)',     fpct(lgAvg.BBpct)],
+    ['Strikeout rate (K%)', fpct(lgAvg.Kpct)],
     ['Hits (avg)',         lgAvg.H.toFixed(1)],
     ['Home runs (avg)',    lgAvg.HR.toFixed(2)],
     ['RBI (avg)',          lgAvg.RBI.toFixed(1)],
@@ -876,7 +891,7 @@ function openBatCard(p) {
   $('modal-body').innerHTML = `
     <div class="modal-section">Batting rate stats</div>
     <div class="modal-grid">
-      ${[['AVG',f3(p.AVG),bp('AVG')],['OBP',f3(p.OBP),bp('OBP')],['SLG',f3(p.SLG),bp('SLG')],['OPS',f3(p.OPS),bp('OPS')]].map(([l,v,b])=>`
+      ${[['AVG',f3(p.AVG),bp('AVG')],['OBP',f3(p.OBP),bp('OBP')],['SLG',f3(p.SLG),bp('SLG')],['OPS',f3(p.OPS),bp('OPS')],['BB%',fpct(p.BBpct),bp('BBpct')],['K%',fpct(p.Kpct),bp('Kpct',true)]].map(([l,v,b])=>`
         <div class="modal-stat"><div class="modal-stat-label">${l}</div><div class="modal-stat-val">${v}${b}</div></div>`).join('')}
     </div>
     <div class="modal-section">Counting stats</div>
