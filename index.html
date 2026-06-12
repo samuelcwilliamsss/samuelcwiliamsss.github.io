@@ -261,6 +261,18 @@ tr:hover td{background:#fafaf8}
 .pos-badge{font-size:10px;font-weight:700;padding:1px 6px;border-radius:5px;background:#f0f0ec;color:var(--text2)}
 .hand-badge{font-size:10px;color:var(--text3);font-weight:600}
 
+/* ── Results tab ── */
+.results-table{width:100%;font-size:12px;border-collapse:collapse;min-width:500px}
+.results-table th{padding:7px 8px;font-size:10.5px;font-weight:700;color:var(--text3);border-bottom:1px solid var(--border);background:#fafaf8;text-align:left;white-space:nowrap}
+.results-table td{padding:6px 8px;border-bottom:1px solid var(--border2);white-space:nowrap}
+.results-table tr:last-child td{border-bottom:none}
+.results-table tr:hover td{background:#fafaf8}
+.score-cell{font-size:13px;font-weight:800;letter-spacing:.02em}
+.team-name-cell{font-weight:700;max-width:160px;overflow:hidden;text-overflow:ellipsis}
+.team-name-cell.winner{color:var(--green)}
+.box-link{font-size:10px;font-weight:700;color:var(--accent);padding:2px 7px;border:1px solid var(--accent);border-radius:5px;white-space:nowrap;transition:all .15s}
+.box-link:hover{background:var(--accent);color:#fff}
+
 /* ── Teams browser ── */
 .teams-browser{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:.75rem}
 .team-browse-card{background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);padding:.9rem;cursor:pointer;transition:all .15s}
@@ -569,6 +581,7 @@ const GID_PIT     = '1358930240';
 const GID_TBAT    = '862775525';
 // These GIDs are created by the bookmarklet — will be '' until first run
 // Replace with actual GIDs after running the bookmarklet (check your sheet tab names)
+const GID_STANDINGS = '1775137492';
 const GID_ROSTERS  = '2000260242';
 const GID_FIXTURES = '2064129312';
 const BBF_BASE = 'https://stats.britishbaseball.org.uk/en/events/2026-d5';
@@ -604,8 +617,24 @@ const TEAM_META = {
   'London Mayhem':            {id:41943, div:'Upper Canal League'},
 };
 
+// BBF team abbreviations → full names (from team pages)
+const TEAM_ABBR = {
+  'BKY':'Bracknell Pyros',    'FCB':'Middlesex Capybaras', 'GUL':'Guildford Millers',
+  'HTE':'Herts Eagles',       'RIU':'Richmond Dukes',      'CBM':'Cambridge Monarchs',
+  'ESR':'Essex Redbacks',     'HTR':'Herts Raptors',       'NHC':'Northants Centurions 2',
+  'BRN':'Bristol Brunels',    'NFK':'New Forest Knights',  'NFT':'New Forest Thunder',
+  'TAP':'Taunton Pistols',    'YWW':'Yeovil Whirlwinds',  'CPN':'Cornish Pioneers',
+  'EXW':'Exeter Wyverns',     'PLM':'Plymouth Mariners',   'PO2':'Plymouth Outlaws 2',
+  'TRT':'Torrington Riptides','BRJ':'Brighton Jets',       'HCB':'Hildenborough Hurricanes 2',
+  'HSP':'Hastings Pirates',   'KEM':'Kent Mariners',       'TOB':'Tonbridge Bobcats',
+  'MRC':'London Mercenaries', 'MAS':'London Mastodons',    'MAY':'London Mayhem',
+  // Extra aliases seen in BBF data
+  'LMC':'London Mercenaries', 'LMA':'London Mastodons',   'LMY':'London Mayhem',
+};
+const abbrToName = abbr => TEAM_ABBR[abbr] || abbr;
+
 const TC = ['#0057ff','#e85d00','#008044','#7c3aed'];
-let BAT=[], PIT=[], TBAT=[], ROSTERS=[], FIXTURES=[], STANDINGS={};
+let BAT=[], PIT=[], TBAT=[], ROSTERS=[], FIXTURES=[], STANDINGS_DATA=[], STANDINGS={};
 let selTeams=[], slA=null, slB=null, pslA=null, pslB=null;
 let bSort='AVG', bDir=-1, bPg=0, bFil=[];
 let pSort='ERA', pDir=1,  pPg=0, pFil=[];
@@ -644,7 +673,7 @@ function parseCSV(text) {
     vals.push(cur.trim().replace(/\r/g,''));
     const obj={}; headers.forEach((h,i)=>obj[h]=vals[i]||'');
     return obj;
-  }).filter(r=>r.Name&&r.Name.trim());
+  }).filter(r=>{ const vals=Object.values(r); return vals.some(v=>v&&v.trim()); });
 }
 
 // ── Load all data ──
@@ -663,15 +692,17 @@ async function loadAll() {
     ];
     // Fetch rosters + fixtures if GIDs are configured
     console.log('GID_ROSTERS:', GID_ROSTERS, 'GID_FIXTURES:', GID_FIXTURES);
+    const standingsPromise = GID_STANDINGS ? fetch(SHEET_BASE+GID_STANDINGS).then(r=>r.ok?r.text():'').catch(()=>'') : Promise.resolve('');
     const rosterPromise  = GID_ROSTERS  ? fetch(SHEET_BASE+GID_ROSTERS).then(r=>{console.log('Roster fetch status:',r.status);return r.ok?r.text():'';}).catch(e=>{console.log('Roster fetch error:',e.message);return '';})  : Promise.resolve('');
     const fixturePromise = GID_FIXTURES ? fetch(SHEET_BASE+GID_FIXTURES).then(r=>{console.log('Fixture fetch status:',r.status);return r.ok?r.text():'';}).catch(e=>{console.log('Fixture fetch error:',e.message);return '';}) : Promise.resolve('');
 
-    const [br,pr,tbr,rr,fr] = await Promise.all([...corePromises, rosterPromise, fixturePromise]);
+    const [br,pr,tbr,rr,fr,stdr] = await Promise.all([...corePromises, rosterPromise, fixturePromise, standingsPromise]);
     BAT=parseCSV(br); PIT=parseCSV(pr); TBAT=parseCSV(tbr);
-    if(rr && rr.trim()) { ROSTERS=parseCSV(rr); console.log('Rosters loaded:', ROSTERS.length, 'rows'); }
-    else { console.log('Rosters empty — raw response length:', rr.length); }
-    if(fr && fr.trim()) { FIXTURES=parseCSV(fr); console.log('Fixtures loaded:', FIXTURES.length, 'rows'); }
-    else { console.log('Fixtures empty — raw response length:', fr.length); }
+    // Strip wrapping quotes that Google Sheets sometimes adds to the entire CSV
+    const cleanCSV = s => { const t=s.trim(); return (t.startsWith('"')&&t.endsWith('"')) ? t.slice(1,-1).replace(/""/g,'"') : t; };
+    if(rr && rr.trim()) { ROSTERS=parseCSV(cleanCSV(rr)); }
+    if(fr && fr.trim()) { FIXTURES=parseCSV(cleanCSV(fr)); }
+    if(stdr && stdr.trim()) { STANDINGS_DATA=parseCSV(cleanCSV(stdr)); }
     $('dot').className='dot live';
     const ts=new Date().toLocaleTimeString();
     const extras = [];
@@ -714,6 +745,7 @@ function init() {
   bPg=0;pPg=0;cPg=0;pcPg=0;
   rBat();rPit();rCmp();rPCmp();rTGrid();rLAvg();rSlots();rPSlots();rLeaderboard();rTeamsBrowser();
   loadStandings(); // build from TBAT sheet (already loaded)
+
   $('bat-loader').style.display='none'; $('bat-content').style.display='block';
   $('pit-loader').style.display='none'; $('pit-content').style.display='block';
 }
@@ -1138,12 +1170,29 @@ function loadStandings(){
 }
 
 function buildStandingsFromSheet(){
-  if(!TBAT.length){
-    $('standings-loader').innerHTML=`<div class="err-box">Sheet data not loaded yet — try refreshing.</div>`;
+  if(!TBAT.length) return;
+
+  // Use scraped standings data if available (has W/L/PCT)
+  if(STANDINGS_DATA.length) {
+    // Group by division
+    const byDiv = {};
+    STANDINGS_DATA.forEach(r => {
+      if(!byDiv[r.Division]) byDiv[r.Division] = [];
+      const pct = parseFloat(r.PCT);
+      byDiv[r.Division].push({
+        name: (()=>{ const t=(r.Team||'').trim(); const lines=t.split(/[\r\n]+/).map(s=>s.trim()).filter(Boolean); const fullName=lines.find(l=>l.length>4&&!/^[A-Z0-9]{2,4}$/.test(l)); return fullName||lines[lines.length-1]||t; })(), W: r.W, L: r.L, T: r.T,
+        pct: r.PCT, GB: r.GB, rank: r.Rank
+      });
+    });
+    const DIV_ORDER = ['Central','East','South','SWWBL Severn','SWWBL Wessex','Upper Canal League','Other'];
+    STANDINGS = DIV_ORDER.filter(d => byDiv[d]).map(div => ({
+      div, rows: byDiv[div] // already sorted by BBF
+    }));
+    renderStandings();
     return;
   }
 
-  // Group teams by division using TEAM_META
+  // Fallback: build from TBAT sheet (no W/L data)
   const byDiv = {};
   TBAT.forEach(t => {
     const meta = Object.entries(TEAM_META).find(([k]) => {
@@ -1152,53 +1201,37 @@ function buildStandingsFromSheet(){
     });
     const div = meta ? meta[1].div : 'Other';
     if(!byDiv[div]) byDiv[div] = [];
-    // Use W/L from sheet if available, otherwise show stats only
-    const W = t.W != null && t.W !== '' ? t.W : '—';
-    const L = t.L != null && t.L !== '' ? t.L : '—';
-    const pct = (W !== '—' && L !== '—')
-      ? (parseInt(W)/(parseInt(W)+parseInt(L))||0).toFixed(3).replace(/^0/,'')
-      : '—';
-    byDiv[div].push({name:t.Name, W, L, pct, AVG:t.AVG, OPS:t.OPS, R:t.R, HR:t.HR});
+    byDiv[div].push({name:t.Name, W:'—', L:'—', T:'—', pct:'—', GB:'—', AVG:t.AVG, OPS:t.OPS});
   });
-
-  // Sort each division — by W desc if available, else by AVG
   const DIV_ORDER = ['Central','East','South','SWWBL Severn','SWWBL Wessex','Upper Canal League','Other'];
-  STANDINGS = DIV_ORDER.filter(d => byDiv[d]).map(div => {
-    const rows = byDiv[div].sort((a,b) => {
-      if(a.W !== '—' && b.W !== '—') return parseInt(b.W) - parseInt(a.W);
-      return flt(b.AVG) - flt(a.AVG);
-    }).map((t,i) => ({...t, rank:i+1}));
-    return {div, rows};
-  });
-
+  STANDINGS = DIV_ORDER.filter(d => byDiv[d]).map(div => ({
+    div, rows: byDiv[div].sort((a,b) => flt(b.AVG)-flt(a.AVG))
+  }));
   renderStandings();
 }
 
 function renderStandings(){
   $('standings-loader').style.display='none';
   $('standings-content').style.display='block';
-
-  // Check if we have W/L data
-  const hasWL = STANDINGS.length && STANDINGS[0].rows.some(r => r.W !== '—');
-
-  $('standings-grid').innerHTML=STANDINGS.map(d=>`
+  const hasWL = STANDINGS_DATA.length > 0; // W/L always available when scraped standings loaded
+  $('standings-grid').innerHTML = STANDINGS.map(d => `
     <div class="division-card">
       <div class="division-hdr">${d.div}</div>
       <table class="div-table">
         <thead><tr>
           <th>Team</th>
-          ${hasWL ? '<th>W</th><th>L</th><th>PCT</th>' : ''}
-          <th>AVG</th><th>OPS</th><th>R</th><th>HR</th>
+          ${hasWL ? '<th>W</th><th>L</th><th>T</th><th>PCT</th><th>GB</th>' : '<th>AVG</th><th>OPS</th>'}
         </tr></thead>
-        <tbody>${d.rows.map(r=>`<tr>
-          <td><span class="rank-num">${r.rank}</span><span class="team-link" onclick="goToTeam('${r.name.replace(/'/g,"\'")}')">${r.name}</span></td>
-          ${hasWL ? `<td>${r.W}</td><td>${r.L}</td><td style="font-weight:700">${r.pct}</td>` : ''}
-          <td>${f3(r.AVG)}</td><td>${f3(r.OPS)}</td><td>${r.R||'—'}</td><td>${r.HR||'—'}</td>
+        <tbody>${d.rows.map((r,i) => `<tr>
+          <td><span class="rank-num">${r.rank||i+1}</span><span class="team-link" onclick="goToTeam('${(r.name||'').replace(/'/g,"\'")}')">${r.name}</span></td>
+          ${hasWL
+            ? `<td style="font-weight:700">${r.W}</td><td>${r.L}</td><td>${r.T||0}</td><td style="font-weight:800;color:var(--accent)">${r.pct}</td><td style="color:var(--text3)">${r.GB}</td>`
+            : `<td>${f3(r.AVG)}</td><td>${f3(r.OPS)}</td>`}
         </tr>`).join('')}</tbody>
       </table>
       <div style="font-size:10px;color:var(--text3);padding:6px 10px;border-top:1px solid var(--border)">
         <a href="https://stats.britishbaseball.org.uk/en/events/2026-d5/standings" target="_blank" style="color:var(--accent)">Full standings on BBF ↗</a>
-        ${!hasWL ? ' · Add W/L columns to your sheet for win-loss records' : ''}
+        ${!hasWL ? ' · Run bookmarklet for W/L records' : ''}
       </div>
     </div>`).join('');
 }
@@ -1262,9 +1295,19 @@ async function openTeamPage(name){
   // Batting/pitching from sheet — fuzzy match to handle minor spelling differences
   const normName = s => (s||'').toLowerCase().trim().replace(/[^a-z0-9 ]/g,'');
   const normName2 = s => (s||'').toLowerCase().trim().replace(/[^a-z0-9]/g,' ').replace(/\s+/g,' ').trim();
-  const matchTeam2 = (sheetName) => sheetName === name || normName2(sheetName) === normName2(name);
+  // Also try matching by key words — handles "New Forest Thunder" vs "NF Thunder" etc
+  const keyWords = name.split(' ').filter(w=>w.length>3).map(w=>w.toLowerCase());
+  const matchTeam2 = (sheetName) => {
+    if(!sheetName) return false;
+    if(sheetName === name) return true;
+    if(normName2(sheetName) === normName2(name)) return true;
+    // Check if sheet name contains all key words from our name
+    const sn = sheetName.toLowerCase();
+    return keyWords.length > 0 && keyWords.every(w => sn.includes(w));
+  };
   const teamBat=BAT.filter(p=>matchTeam2(p.Team));
   const teamPit=PIT.filter(p=>matchTeam2(p.Team));
+  console.log('Team batting rows found:', teamBat.length, 'for', name);
 
   // BBF team pages block all CORS proxies — render with sheet data only
   // Roster & results available directly on BBF site
@@ -1366,27 +1409,70 @@ function renderTeamPage(name, meta, teamBat, teamPit){
       return toDate(a.Date).localeCompare(toDate(b.Date));
     });
 
-  if (teamFixtures.length) {
-    // Deduplicate by GameID (fixtures appear once per team so shouldn't dupe, but safety check)
-    const seen = new Set();
-    const unique = teamFixtures.filter(r => { if(seen.has(r.GameID)) return false; seen.add(r.GameID); return true; });
+  // Get ALL fixtures involving this team — not just from their own page
+  // This catches games that were only scraped from the opponent's page
+  const myAbbr = Object.entries(TEAM_ABBR).find(([k,v]) => normName(v) === normName(name))?.[0] || '';
+  console.log('My abbr:', myAbbr, 'for', name);
 
-    $('tp-results').innerHTML = unique.map(r => {
-      const isHome = normName(r.Home) === normName(name.substring(0,3)) || r.Home === '';
-      // Determine if this team is Home or Away by matching abbr
-      // The Home/Away columns store team abbreviations from BBF
-      // We can't reliably match abbr → team name, so show both sides
+  // Pull all fixtures where this team appears as Home OR Away (across all team entries)
+  const allMyFixtures = FIXTURES.filter(r =>
+    r.Home === myAbbr || r.Away === myAbbr ||
+    matchTeam(r.Team) // also keep ones stored under this team name
+  ).sort((a,b) => {
+    const toDate = d => { if(!d) return ''; const p=d.split('/'); return p.length===3?`${p[2]}-${p[1]}-${p[0]}`:''; };
+    return toDate(a.Date).localeCompare(toDate(b.Date));
+  });
+
+  // Deduplicate by GameID — keep the copy that belongs to this team if available
+  const seenGames = new Map();
+  allMyFixtures.forEach(r => {
+    if (!seenGames.has(r.GameID) || matchTeam(r.Team)) {
+      seenGames.set(r.GameID, r);
+    }
+  });
+  const unique = [...seenGames.values()].sort((a,b) => {
+    const toDate = d => { if(!d) return ''; const p=d.split('/'); return p.length===3?`${p[2]}-${p[1]}-${p[0]}`:''; };
+    return toDate(a.Date).localeCompare(toDate(b.Date));
+  });
+
+  // Results — link directly to BBF team page
+  $('tp-results').innerHTML = `
+    <a href="${bbfTeamUrl}" target="_blank" 
+       style="display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;
+              color:var(--accent);padding:8px 14px;border:1.5px solid var(--accent);
+              border-radius:var(--radius-sm);background:var(--accent-bg);text-decoration:none">
+      View results &amp; fixtures on BBF ↗
+    </a>`;
+
+  if (false) { // old per-row rendering  if (false) { // old per-row rendering — replaced by Results tab
+    unique.map(r => {
       const played = r.Played === 'Y';
-      const hs = parseInt(r.HomeScore), as2 = parseInt(r.AwayScore);
+      const homeTeam = abbrToName(r.Home);
+      const awayTeam = abbrToName(r.Away);
+      // Determine if THIS team is home or away
+      // Priority: 1) use abbr match, 2) use TeamIsHome flag, 3) use Home abbr lookup
+      let iAmHome;
+      if (myAbbr && r.Home && r.Away) {
+        iAmHome = r.Home === myAbbr;
+      } else if (r.TeamIsHome !== undefined && r.TeamIsHome !== '') {
+        // TeamIsHome = Y means the Team column team was the home team
+        iAmHome = matchTeam(r.Team) ? r.TeamIsHome === 'Y' : r.TeamIsHome === 'N';
+      } else {
+        // Last resort: if we're viewing this team and it's stored under their name,
+        // we can't determine home/away — show scores as-is with no W/L
+        iAmHome = false; // will show as away perspective
+      }
+      const iAmAway = !iAmHome;
+      const oppName = iAmHome ? awayTeam : homeTeam;
+      const ha = iAmHome ? 'home' : 'away';
 
-      // Figure out if we won/lost — we need to know if this team is home or away
-      // Use the team name match approach: check TEAM_META for our abbreviation
-      const myMeta = meta;
-      // We can't directly match abbr, so show the result from both perspectives
-      // and let the user read it
+      const hs = parseInt(r.HomeScore) || 0;
+      const as2 = parseInt(r.AwayScore) || 0;
+      const myScore  = iAmHome ? hs : as2;
+      const oppScore = iAmHome ? as2 : hs;
+      const wl = myScore > oppScore ? 'w' : myScore < oppScore ? 'l' : 't';
       const resultLine = played
-        ? `<span style="font-weight:800;font-size:13px">${r.AwayScore} – ${r.HomeScore}</span>
-           <span style="font-size:10px;color:var(--text3);margin-left:2px">(away – home)</span>`
+        ? `<span class="result-score ${wl}">${myScore} – ${oppScore} <span class="win-badge ${wl}">${wl.toUpperCase()}</span></span>`
         : `<span class="result-upcoming">Upcoming</span>`;
 
       const boxLink = played && r.BoxScoreURL
@@ -1395,14 +1481,15 @@ function renderTeamPage(name, meta, teamBat, teamPit){
 
       return `<div class="result-row">
         <span class="result-date">${r.Date||'TBC'}</span>
-        <span style="font-size:11px;font-weight:700;min-width:80px">${r.Away} <span style="color:var(--text3);font-weight:400">@</span> ${r.Home}</span>
+        <span class="result-ha ${ha}">${ha}</span>
+        <span class="result-opp" style="flex:1;font-weight:700;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${oppName}</span>
         ${resultLine}
         ${boxLink}
       </div>`;
     }).join('') + `<div style="margin-top:8px;font-size:11px;color:var(--text3)">
       <a href="${bbfTeamUrl}" target="_blank" style="color:var(--accent)">Full schedule on BBF ↗</a>
     </div>`;
-  } else {
+  } else { // unique.length === 0
     $('tp-results').innerHTML = `
       <div style="padding:.75rem;border:1px solid var(--border);border-radius:var(--radius-sm);background:#fafaf8;font-size:12px;color:var(--text2)">
         <div style="margin-bottom:8px;color:var(--text3)">Run the team bookmarklet to load results &amp; fixtures.</div>
