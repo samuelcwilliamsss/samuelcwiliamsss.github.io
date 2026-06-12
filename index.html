@@ -661,17 +661,33 @@ function pctBadge(rank) {
   return `<span class="pct-badge ${cls}">P${rank}</span>`;
 }
 function parseCSV(text) {
-  const lines=text.trim().split('\n');
-  const headers=lines[0].split(',').map(h=>h.trim().replace(/\r/g,''));
-  return lines.slice(1).map(line=>{
-    const vals=[]; let cur='',inQ=false;
-    for(const ch of line){
-      if(ch==='"') inQ=!inQ;
-      else if(ch===','&&!inQ){vals.push(cur.trim());cur='';}
-      else cur+=ch;
+  // Proper CSV parser that handles quoted fields with embedded newlines
+  const rows = [];
+  let cur = '', inQ = false, fields = [], i = 0;
+  const t = text.trim();
+  while(i <= t.length) {
+    const ch = t[i];
+    if(ch === '"') {
+      if(inQ && t[i+1] === '"') { cur += '"'; i += 2; continue; }
+      inQ = !inQ;
+    } else if((ch === ',' || ch === undefined) && !inQ) {
+      fields.push(cur.replace(/\r/g,'').trim());
+      cur = '';
+    } else if((ch === '\n') && !inQ) {
+      fields.push(cur.replace(/\r/g,'').trim());
+      rows.push(fields);
+      fields = []; cur = '';
+    } else {
+      cur += (ch||'');
     }
-    vals.push(cur.trim().replace(/\r/g,''));
-    const obj={}; headers.forEach((h,i)=>obj[h]=vals[i]||'');
+    i++;
+  }
+  if(fields.length || cur.trim()) { fields.push(cur.replace(/\r/g,'').trim()); rows.push(fields); }
+  if(!rows.length) return [];
+  const headers = rows[0].map(h=>h.trim());
+  return rows.slice(1).map(row => {
+    const obj = {};
+    headers.forEach((h,i) => obj[h] = (row[i]||'').replace(/\n/g,' ').trim());
     return obj;
   }).filter(r=>{ const vals=Object.values(r); return vals.some(v=>v&&v.trim()); });
 }
