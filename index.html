@@ -262,6 +262,11 @@ tr:hover td{background:#fafaf8}
 .pos-badge{font-size:10px;font-weight:700;padding:1px 6px;border-radius:5px;background:#f0f0ec;color:var(--text2)}
 .hand-badge{font-size:10px;color:var(--text3);font-weight:600}
 
+.home-card{background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);padding:1.5rem 1.25rem;cursor:pointer;transition:all .15s;text-align:left}
+.home-card:hover{border-color:var(--accent);background:var(--accent-bg);transform:translateY(-2px);box-shadow:0 4px 16px rgba(0,87,255,.1)}
+.home-card-title{font-size:17px;font-weight:800;color:var(--text1);margin-bottom:6px;line-height:1.2}
+.home-card-sub{font-size:12px;color:var(--text3);font-weight:500}
+
 /* ── Results tab ── */
 .results-table{width:100%;font-size:12px;border-collapse:collapse;min-width:500px}
 .results-table th{padding:7px 8px;font-size:10.5px;font-weight:700;color:var(--text3);border-bottom:1px solid var(--border);background:#fafaf8;text-align:left;white-space:nowrap}
@@ -313,7 +318,8 @@ tr:hover td{background:#fafaf8}
   </header>
 
   <div class="tabs">
-    <button class="tab active" onclick="show('bat')" id="tab-bat">Batting</button>
+    <button class="tab" onclick="show('home')" id="tab-home">Home</button>
+    <button class="tab" onclick="show('bat')" id="tab-bat">Batting</button>
     <button class="tab" onclick="show('pit')" id="tab-pit">Pitching</button>
     <button class="tab" onclick="show('leaders')" id="tab-leaders">Leaderboard</button>
     <button class="tab" onclick="show('standings')" id="tab-standings">Standings</button>
@@ -322,10 +328,30 @@ tr:hover td{background:#fafaf8}
     <button class="tab" onclick="show('pcmp')" id="tab-pcmp">Compare pitchers</button>
     <button class="tab" onclick="show('tcmp')" id="tab-tcmp">Compare teams</button>
     <button class="tab" onclick="show('lavg')" id="tab-lavg">League averages</button>
+    <button class="tab" onclick="show('analytics')" id="tab-analytics">Analytics</button>
   </div>
 
   <!-- BATTING -->
-  <div id="p-bat" class="panel active">
+  <div id="p-home" class="panel active">
+    <div style="text-align:center;padding:1.5rem 0 1rem">
+      <div style="font-size:26px;font-weight:800;color:var(--accent);letter-spacing:-.01em">BBF Scout</div>
+      <div style="font-size:14px;color:var(--text3);margin-top:6px;font-weight:500">Division 5 · 2026</div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:1rem;padding-bottom:1rem">
+      <div class="home-card" onclick="show('bat')"><div class="home-card-title">Batting Stats</div><div class="home-card-sub" id="hc-bat">Loading…</div></div>
+      <div class="home-card" onclick="show('pit')"><div class="home-card-title">Pitching Stats</div><div class="home-card-sub" id="hc-pit">Loading…</div></div>
+      <div class="home-card" onclick="show('standings')"><div class="home-card-title">Standings</div><div class="home-card-sub">W · L · PCT · GB</div></div>
+      <div class="home-card" onclick="show('leaders')"><div class="home-card-title">Leaderboards</div><div class="home-card-sub">Top 10 per stat</div></div>
+      <div class="home-card" onclick="show('teams')"><div class="home-card-title">Teams</div><div class="home-card-sub">Rosters &amp; stats</div></div>
+      <div class="home-card" onclick="show('cmp')"><div class="home-card-title">Compare Batters</div><div class="home-card-sub">Head to head</div></div>
+      <div class="home-card" onclick="show('pcmp')"><div class="home-card-title">Compare Pitchers</div><div class="home-card-sub">Head to head</div></div>
+      <div class="home-card" onclick="show('cteam')"><div class="home-card-title">Compare Teams</div><div class="home-card-sub">Up to 4 teams</div></div>
+      <div class="home-card" onclick="show('lavg')"><div class="home-card-title">League Averages</div><div class="home-card-sub">Division-wide stats</div></div>
+      <div class="home-card" onclick="show('analytics')"><div class="home-card-title">Analytics</div><div class="home-card-sub">Player similarity</div></div>
+    </div>
+  </div>
+
+  <div id="p-bat" class="panel">
     <div id="bat-loader" class="loader"><div class="spin"></div><span>Loading batting stats…</span></div>
     <div id="bat-content" style="display:none">
       <div class="ctrl">
@@ -349,6 +375,7 @@ tr:hover td{background:#fafaf8}
           <th onclick="sby('OBP')">OBP</th>
           <th onclick="sby('SLG')">SLG</th>
           <th onclick="sby('OPS')">OPS</th>
+          <th onclick="sby('WAR')">WAR</th>
           <th></th>
         </tr></thead>
         <tbody id="bbody"></tbody>
@@ -366,6 +393,7 @@ tr:hover td{background:#fafaf8}
         <input type="text" id="psrch" placeholder="Search pitcher…" oninput="rPit()">
         <select id="pteam" onchange="rPit()"><option value="">All teams</option></select>
         <span id="pcount" style="font-size:12px;color:var(--text3)"></span>
+        <label class="chk"><input type="checkbox" id="pqual" checked onchange="rPit()"> Min 10 IP</label>
       </div>
       <div class="tw"><table>
         <thead><tr>
@@ -379,6 +407,7 @@ tr:hover td{background:#fafaf8}
           <th onclick="spy('ERA')" class="s">ERA ↑</th>
           <th onclick="spy('WHIP')">WHIP</th>
           <th onclick="spy('BAVG')">BAA</th>
+          <th onclick="spy('WAR')">WAR</th>
         </tr></thead>
         <tbody id="pbody"></tbody>
       </table></div>
@@ -447,6 +476,22 @@ tr:hover td{background:#fafaf8}
         <div style="margin-top:1rem">
           <div class="team-section-hdr">Pitching</div>
           <div class="tw" id="tp-pit-wrap"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ANALYTICS -->
+  <div id="p-analytics" class="panel">
+    <div style="max-width:480px">
+      <div class="division-card">
+        <div class="division-hdr">Player similarity</div>
+        <div style="padding:.75rem">
+          <div style="position:relative;margin-bottom:.75rem">
+            <input type="text" id="sim-search" placeholder="Search a batter…" oninput="rSimSearch()" style="font-size:13px;width:100%">
+            <div id="sim-dropdown" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid var(--border);border-radius:var(--radius-sm);z-index:20;box-shadow:0 4px 12px rgba(0,0,0,.1)"></div>
+          </div>
+          <div id="sim-content"><div style="font-size:12px;color:var(--text3)">Search and select a player to see their 5 most similar batters.</div></div>
         </div>
       </div>
     </div>
@@ -693,6 +738,459 @@ function parseCSV(text) {
   }).filter(r=>{ const vals=Object.values(r); return vals.some(v=>v&&v.trim()); });
 }
 
+
+// ══════════════════════════════════════════════
+// ANALYTICS TAB
+// ══════════════════════════════════════════════
+
+// ── WAR calculation ──
+// Batting WAR: wRAA (runs above avg from OBP+SLG) + BsR (SB) - positional adj
+// Pitching WAR: ERA-based runs saved vs replacement level
+function calcWAR() {
+  // Positional adjustment removed — positions recorded as UTL in this division
+  const REPL_OBP = lgAvg.OBP ? lgAvg.OBP * 0.87 : 0.28;
+  const REPL_SLG = lgAvg.SLG ? lgAvg.SLG * 0.87 : 0.37;
+  const RUNS_PER_WIN = 9.5;
+
+  // Build position lookup from rosters
+  // posMap now built in init()
+
+  const batWAR = BAT.filter(p => flt(p.AB) >= 10).map(p => {
+    const obp = flt(p.OBP), slg = flt(p.SLG), ab = flt(p.AB), sb = flt(p.SB);
+    const wRAA = ((obp - lgAvg.OBP) * 1.8 + (slg - lgAvg.SLG) * 0.7) * ab / 600;
+    const bsR = sb * 0.2;
+    const pos = posMap[p.Name] || 'UTL';
+    const posAdj = 0; // position adjustment removed
+    const replRuns = ((REPL_OBP - lgAvg.OBP) * 1.8 + (REPL_SLG - lgAvg.SLG) * 0.7) * ab / 600;
+    const war = wRAA + bsR + posAdj - replRuns;
+    return { name: p.Name, team: p.Team, war: Math.round(war * 10) / 10, type: 'bat', pos };
+  }).sort((a,b) => b.war - a.war);
+
+  // Pitching WAR: (lgERA - ERA) / 9 * IP / RUNS_PER_WIN + replacement
+  const replERA = lgPitAvg.ERA ? lgPitAvg.ERA * 1.3 : 8.0;
+  const pitWAR = PIT.filter(p => flt(p.IP) >= 5).map(p => {
+    const era = flt(p.ERA), ip = flt(p.IP);
+    const runsAboveRepl = (replERA - era) / 9 * ip;
+    const war = Math.round(runsAboveRepl / RUNS_PER_WIN * 10) / 10;
+    return { name: p.Name, team: p.Team, war, type: 'pit', ip };
+  }).sort((a,b) => b.war - a.war);
+
+  return { batWAR, pitWAR };
+}
+
+function rSimSearch() {
+  const q = ($('sim-search') ? $('sim-search').value : '').toLowerCase();
+  const dd = $('sim-dropdown'); if(!dd) return;
+  if (!q || q.length < 2) { dd.style.display='none'; return; }
+  const qual = BAT.filter(p => flt(p.AB) >= 10);
+  const matches = qual.filter(p => p.Name.toLowerCase().includes(q)).slice(0, 6);
+  if (!matches.length) { dd.style.display='none'; return; }
+  dd.style.display = 'block';
+  dd.innerHTML = matches.map(function(p) {
+    return '<div class="sim-opt" data-name="'+p.Name.replace(/"/g,'&quot;')+'" style="padding:6px 10px;cursor:pointer;font-size:12px;border-bottom:0.5px solid var(--border2)">'
+      + '<span style="font-weight:700">'+p.Name+'</span> <span style="color:var(--text3);font-size:11px">'+p.Team+'</span></div>';
+  }).join('');
+  dd.querySelectorAll('.sim-opt').forEach(function(el) {
+    el.addEventListener('click', function() { selectSimPlayer(this.dataset.name); });
+    el.addEventListener('mouseover', function() { this.style.background='var(--accent-bg)'; });
+    el.addEventListener('mouseout', function() { this.style.background=''; });
+  });
+}
+
+function selectSimPlayer(name) {
+  const dd = $('sim-dropdown'); if(dd) dd.style.display='none';
+  const inp = $('sim-search'); if(inp) inp.value = name;
+  const el = $('sim-content'); if(!el) return;
+
+  const qual = BAT.filter(p => flt(p.AB) >= 10);
+  const target = qual.find(p => p.Name === name);
+  if (!target) return;
+
+  const fields = ['AVG','OBP','SLG','HR','RBI','SB','BB','SO','BBpct','Kpct'];
+  const ranges = {};
+  fields.forEach(f => {
+    const vals = qual.map(p => flt(p[f]));
+    ranges[f] = { min: Math.min(...vals), max: Math.max(...vals) };
+  });
+  const norm = (p, f) => {
+    const r = ranges[f]; if(r.max === r.min) return 0;
+    return (flt(p[f]) - r.min) / (r.max - r.min);
+  };
+  const dist = p => Math.sqrt(fields.reduce((s,f) => s + Math.pow(norm(p,f) - norm(target,f), 2), 0));
+  const similar = qual.filter(p => p.Name !== target.Name)
+    .map(p => ({ name:p.Name, team:p.Team, AVG:p.AVG, OPS:p.OPS, WAR:p.WAR, _dist:dist(p) }))
+    .sort((a,b) => a._dist - b._dist)
+    .slice(0, 5);
+
+  const warCol = w => w===null?'var(--text3)':w>=1?'#008044':w>=0?'#0057ff':'#cc2200';
+  const warCol2 = function(w) { return w===null?'var(--text3)':w>=1?'#008044':w>=0?'#0057ff':'#cc2200'; };
+  const twar = target.WAR===null?'—':(target.WAR>0?'+':'')+target.WAR;
+  el.innerHTML = '<div style="background:var(--accent-bg);border:1px solid var(--accent);border-radius:var(--radius-sm);padding:10px 12px;margin-bottom:12px">'
+    + '<div style="font-size:13px;font-weight:800;margin-bottom:2px">'+target.Name+'</div>'
+    + '<div style="font-size:11px;color:var(--text3);margin-bottom:8px">'+target.Team+'</div>'
+    + '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px">'
+    + ['AVG','OBP','SLG','OPS'].map(function(s){return '<div style="text-align:center"><div style="font-size:9px;font-weight:700;color:var(--text3);margin-bottom:2px">'+s+'</div><div style="font-size:14px;font-weight:800">'+f3(target[s])+'</div></div>';}).join('')
+    + '</div>'
+    + '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:6px">'
+    + [['HR',target.HR],['RBI',target.RBI],['SB',target.SB],['WAR',twar]].map(function(sv){return '<div style="text-align:center"><div style="font-size:9px;font-weight:700;color:var(--text3);margin-bottom:2px">'+sv[0]+'</div><div style="font-size:14px;font-weight:800;color:'+(sv[0]==='WAR'?warCol2(target.WAR):'var(--text1)')+'">'+sv[1]+'</div></div>';}).join('')
+    + '</div>'
+    + '</div>'
+    + '<div style="font-size:11px;font-weight:700;color:var(--text3);margin-bottom:6px;margin-top:14px">5 most similar batters</div>'
+    + '<div style="display:grid;grid-template-columns:1fr 44px 44px 44px 48px;gap:4px;font-size:9px;font-weight:700;color:var(--text3);margin-bottom:4px;padding-bottom:4px;border-bottom:1px solid var(--border2)">'
+    + '<span>Player</span><span style="text-align:right">AVG</span><span style="text-align:right">OPS</span><span style="text-align:right">WAR</span><span style="text-align:right">Match</span></div>'
+    + similar.map(p => {
+        const match = Math.max(0, Math.round((1 - p._dist / 2) * 100));
+        const war = p.WAR===null ? '—' : (p.WAR>0?'+':'')+p.WAR;
+        return '<div style="display:grid;grid-template-columns:1fr 44px 44px 44px 48px;gap:4px;align-items:center;margin-bottom:7px;font-size:11px">'
+          + '<span><span style="font-weight:700">'+p.name+'</span><br><span style="font-size:9px;color:var(--text3)">'+p.team+'</span></span>'
+          + '<span style="text-align:right">'+f3(p.AVG)+'</span>'
+          + '<span style="text-align:right">'+f3(p.OPS)+'</span>'
+          + '<span style="text-align:right;font-weight:700;color:'+warCol2(p.WAR)+'">'+war+'</span>'
+          + '<span style="text-align:right;font-size:10px;font-weight:700;color:var(--accent)">'+match+'%</span>'
+          + '</div>';
+      }).join('')
+    + '<div style="font-size:9px;color:var(--text3);margin-top:4px;border-top:1px solid var(--border2);padding-top:6px">Based on AVG, OBP, SLG, HR, RBI, SB, BB%, K%</div>';
+}
+
+function rWAR() {
+  if (!BAT.length || !lgAvg.OBP) { $('war-content').innerHTML='<div style="font-size:12px;color:var(--text3)">Refresh to load WAR data.</div>'; return; }
+  const { batWAR, pitWAR } = calcWAR();
+  const top10bat = batWAR.slice(0, 10);
+  const top10pit = pitWAR.slice(0, 10);
+  const maxWar = Math.max(...top10bat.map(p=>p.war), ...top10pit.map(p=>p.war), 0.1);
+
+  function renderList(list, label) {
+    var html = '<div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">'+label+'</div>';
+    list.forEach(function(p, i) {
+      var pct = Math.max(4, Math.round(p.war / maxWar * 100));
+      var col = p.war >= 2 ? '#008044' : p.war >= 1 ? '#0057ff' : p.war >= 0 ? '#888' : '#cc2200';
+      html += '<div style="display:grid;grid-template-columns:20px 1fr 90px 42px;align-items:center;gap:6px;margin-bottom:5px">'
+        + '<span style="font-size:10px;color:var(--text3);text-align:right">'+(i+1)+'</span>'
+        + '<span style="font-size:11px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+p.name+'</span>'
+        + '<div style="position:relative;height:8px;background:var(--border2);border-radius:4px;overflow:hidden">'
+        + '<div style="position:absolute;left:0;top:0;height:100%;width:'+pct+'%;background:'+col+';border-radius:4px"></div></div>'
+        + '<span style="font-size:12px;font-weight:800;color:'+col+';text-align:right">'+(p.war > 0 ? '+' : '')+p.war+'</span>'
+        + '</div>';
+    });
+    return html;
+  }
+
+  $('war-content').innerHTML = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">'
+    + renderList(top10bat, 'Batting WAR')
+    + renderList(top10pit, 'Pitching WAR')
+    + '</div><div style="font-size:10px;color:var(--text3);margin-top:8px;border-top:1px solid var(--border2);padding-top:6px">Estimated WAR · Batting: wRAA + BsR + position adj vs replacement · Pitching: ERA vs replacement level</div>';
+}
+
+// ── Team scatter (Offence vs Defence) ──
+function rTeamScatter() {
+  if (!TBAT.length) return;
+  const cvs = $('team-scatter'); if (!cvs) return;
+  const ctx = cvs.getContext('2d');
+  const W = Math.max(200, (cvs.parentElement ? cvs.parentElement.clientWidth : 340) - 16), H = 220;
+  cvs.width = W; cvs.height = H;
+  cvs.width = W; cvs.height = H;
+  const pad = { l: 40, r: 20, t: 20, b: 40 };
+
+  const teams = TBAT.map(t => ({
+    name: t.Name, ops: flt(t.OPS),
+    era: flt(TBAT.find ? 0 : 0) // we use team pitching ERA if available
+  }));
+
+  // Use team OPS for offence, find matching team pitching ERA
+  const tPitMap = {};
+  // Build from player pitching grouped by team
+  const teamERA = {};
+  PIT.forEach(p => {
+    if (!teamERA[p.Team]) teamERA[p.Team] = { ers: 0, ip: 0 };
+    teamERA[p.Team].ers += flt(p.ER);
+    teamERA[p.Team].ip += flt(p.IP);
+  });
+
+  const pts = TBAT.map(t => ({
+    name: t.Name.replace(/ (Pyros|Capybaras|Millers|Eagles|Dukes|Monarchs|Redbacks|Raptors|Centurions 2|Brunels|Knights|Thunder|Pistols|Whirlwinds|Pioneers|Wyverns|Mariners|Outlaws 2|Riptides|Jets|Hurricanes 2|Pirates|Mariners|Bobcats|Mercenaries|Mastodons|Mayhem)$/, '').trim(),
+    ops: flt(t.OPS),
+    era: teamERA[t.Name] && teamERA[t.Name].ip > 0
+      ? Math.round(teamERA[t.Name].ers / teamERA[t.Name].ip * 9 * 10) / 10 : null
+  })).filter(p => p.era !== null);
+
+  if (!pts.length) { ctx.fillStyle = '#999'; ctx.font = '12px sans-serif'; ctx.fillText('Insufficient data', 10, 110); return; }
+
+  const opsMin = Math.min(...pts.map(p=>p.ops)) * 0.95;
+  const opsMax = Math.max(...pts.map(p=>p.ops)) * 1.05;
+  const eraMin = Math.min(...pts.map(p=>p.era)) * 0.9;
+  const eraMax = Math.max(...pts.map(p=>p.era)) * 1.1;
+  const lgOPS = lgAvg.OPS || (opsMin + opsMax) / 2;
+  const lgERA = lgPitAvg.ERA || (eraMin + eraMax) / 2;
+
+  const xPos = ops => pad.l + (ops - opsMin) / (opsMax - opsMin) * (W - pad.l - pad.r);
+  const yPos = era => pad.t + (era - eraMin) / (eraMax - eraMin) * (H - pad.t - pad.b);
+
+  ctx.clearRect(0, 0, W, H);
+
+  // Quadrant lines
+  ctx.strokeStyle = 'rgba(0,0,0,0.08)'; ctx.lineWidth = 1; ctx.setLineDash([4, 4]);
+  ctx.beginPath(); ctx.moveTo(xPos(lgOPS), pad.t); ctx.lineTo(xPos(lgOPS), H - pad.b); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(pad.l, yPos(lgERA)); ctx.lineTo(W - pad.r, yPos(lgERA)); ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Quadrant labels
+  ctx.font = '9px sans-serif'; ctx.fillStyle = 'rgba(0,0,0,0.2)';
+  ctx.fillText('Good bat / Good pitch', pad.l + 4, pad.t + 12);
+  ctx.fillText('Good bat / Weak pitch', pad.l + 4, H - pad.b - 4);
+
+  // Points
+  pts.forEach(p => {
+    const x = xPos(p.ops), y = yPos(p.era);
+    const good = p.ops > lgOPS && p.era < lgERA;
+    const col = good ? '#008044' : p.ops < lgOPS && p.era > lgERA ? '#cc2200' : '#0057ff';
+    ctx.beginPath(); ctx.arc(x, y, 5, 0, Math.PI * 2);
+    ctx.fillStyle = col; ctx.fill();
+    ctx.font = 'bold 9px sans-serif'; ctx.fillStyle = '#333';
+    ctx.fillText(p.name.substring(0, 8), x + 7, y + 4);
+  });
+
+  // Axes
+  ctx.fillStyle = '#999'; ctx.font = '9px sans-serif';
+  ctx.fillText('← lower ERA better', pad.l, pad.t - 6);
+  ctx.fillText('OPS →', W - pad.r - 30, H - 4);
+}
+
+// ── Plate discipline scatter (K% vs BB%) ──
+function rDiscScatter() {
+  if (!BAT.length) return;
+  const cvs = $('disc-scatter'); if (!cvs) return;
+  const ctx = cvs.getContext('2d');
+  const W = Math.max(200, (cvs.parentElement ? cvs.parentElement.clientWidth : 340) - 16), H = 220;
+  cvs.width = W; cvs.height = H;
+  cvs.width = W; cvs.height = H;
+  const pad = { l: 36, r: 16, t: 16, b: 36 };
+
+  const pts = BAT.filter(p => flt(p.AB) >= 10);
+  if (!pts.length) return;
+
+  const kMin = 0, kMax = Math.min(100, Math.max(...pts.map(p => flt(p.Kpct))) * 1.1);
+  const bMin = 0, bMax = Math.max(...pts.map(p => flt(p.BBpct))) * 1.1;
+  const lgK = lgAvg.Kpct || 20, lgB = lgAvg.BBpct || 10;
+
+  const xPos = k => pad.l + (k - kMin) / (kMax - kMin) * (W - pad.l - pad.r);
+  const yPos = b => H - pad.b - (b - bMin) / (bMax - bMin) * (H - pad.t - pad.b);
+
+  ctx.clearRect(0, 0, W, H);
+
+  // Quadrant lines
+  ctx.strokeStyle = 'rgba(0,0,0,0.08)'; ctx.lineWidth = 1; ctx.setLineDash([4, 4]);
+  ctx.beginPath(); ctx.moveTo(xPos(lgK), pad.t); ctx.lineTo(xPos(lgK), H - pad.b); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(pad.l, yPos(lgB)); ctx.lineTo(W - pad.r, yPos(lgB)); ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Quadrant labels (good = low K, high BB = top-left)
+  ctx.font = '8px sans-serif'; ctx.fillStyle = 'rgba(0,128,68,0.4)';
+  ctx.fillText('Elite', pad.l + 4, pad.t + 10);
+  ctx.fillStyle = 'rgba(204,34,0,0.3)';
+  ctx.fillText('Free swinger', W - pad.r - 55, H - pad.b - 4);
+
+  // Points
+  pts.forEach(p => {
+    const x = xPos(flt(p.Kpct)), y = yPos(flt(p.BBpct));
+    const elite = flt(p.Kpct) < lgK && flt(p.BBpct) > lgB;
+    const poor = flt(p.Kpct) > lgK && flt(p.BBpct) < lgB;
+    ctx.beginPath(); ctx.arc(x, y, 4, 0, Math.PI * 2);
+    ctx.fillStyle = elite ? '#008044' : poor ? '#cc2200' : '#0057ff88';
+    ctx.fill();
+  });
+
+  // Axes labels
+  ctx.fillStyle = '#999'; ctx.font = '9px sans-serif';
+  ctx.fillText('BB% ↑', 2, pad.t + 10);
+  ctx.fillText('K% →', W - pad.r - 20, H - 4);
+
+  // Avg lines labels
+  ctx.fillStyle = '#aaa'; ctx.font = '8px sans-serif';
+  ctx.fillText('Avg K%', xPos(lgK) + 3, pad.t + 10);
+  ctx.fillText('Avg BB%', pad.l + 4, yPos(lgB) - 3);
+}
+
+// ── WAR vs OPS scatter ──
+function rWARScatter() {
+  const cvs = $('war-scatter'); if (!cvs) return;
+  const ctx = cvs.getContext('2d');
+  const W = cvs.parentElement ? cvs.parentElement.clientWidth - 16 : 320, H = 220;
+  cvs.width = W; cvs.height = H;
+  const pad = { l: 36, r: 16, t: 20, b: 36 };
+
+  const pts = BAT.filter(p => flt(p.AB) >= 10 && p.WAR !== null);
+  if (!pts.length) { ctx.fillStyle='#999'; ctx.font='12px sans-serif'; ctx.fillText('No data',10,110); return; }
+
+  const opsMin = Math.min(...pts.map(p=>flt(p.OPS)))*0.95;
+  const opsMax = Math.max(...pts.map(p=>flt(p.OPS)))*1.05;
+  const warMin = Math.min(...pts.map(p=>p.WAR))-0.1;
+  const warMax = Math.max(...pts.map(p=>p.WAR))+0.1;
+  const lgOPS = lgAvg.OPS||1.0;
+
+  const xPos = ops => pad.l + (ops-opsMin)/(opsMax-opsMin)*(W-pad.l-pad.r);
+  const yPos = war => H-pad.b - (war-warMin)/(warMax-warMin)*(H-pad.t-pad.b);
+
+  ctx.clearRect(0,0,W,H);
+
+  // Avg OPS line
+  ctx.strokeStyle='rgba(0,0,0,0.08)'; ctx.lineWidth=1; ctx.setLineDash([4,4]);
+  ctx.beginPath(); ctx.moveTo(xPos(lgOPS),pad.t); ctx.lineTo(xPos(lgOPS),H-pad.b); ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Points — top 5 labelled
+  const sorted = [...pts].sort((a,b)=>b.WAR-a.WAR);
+  pts.forEach(p => {
+    const x=xPos(flt(p.OPS)), y=yPos(p.WAR);
+    const top = sorted.indexOf(p) < 5;
+    ctx.beginPath(); ctx.arc(x,y,top?5:3,0,Math.PI*2);
+    ctx.fillStyle = p.WAR>=1?'#008044':p.WAR>=0?'#0057ff88':'#cc220088';
+    ctx.fill();
+    if(top){
+      ctx.font='bold 8px sans-serif'; ctx.fillStyle='#333';
+      ctx.fillText(p.Name.split(' ')[0], x+7, y+3);
+    }
+  });
+
+  // Axes
+  ctx.fillStyle='#aaa'; ctx.font='9px sans-serif';
+  ctx.fillText('WAR ↑', 2, pad.t+8);
+  ctx.fillText('OPS →', W-pad.r-25, H-4);
+  ctx.fillText('Avg OPS', xPos(lgOPS)+3, pad.t+10);
+}
+
+// ── Player radar chart ──
+let radarPlayer = null;
+
+function rRadarSearch() {
+  const q = ($('radar-search') ? $('radar-search').value : '').toLowerCase();
+  const res = $('radar-results');
+  if (!q || q.length < 2) { res.innerHTML = ''; return; }
+  const matches = BAT.filter(p => p.Name.toLowerCase().includes(q) && flt(p.AB) >= 10).slice(0, 5);
+  res.innerHTML = matches.map(function(p) {
+    var data = JSON.stringify({Name:p.Name,Team:p.Team,AVG:p.AVG,OBP:p.OBP,SLG:p.SLG,HR:p.HR,BB:p.BB,SO:p.SO,SB:p.SB,BBpct:p.BBpct,Kpct:p.Kpct,OPS:p.OPS,RBI:p.RBI,R:p.R,H:p.H}).replace(/"/g,'&quot;');
+    return '<span onclick="setRadarPlayer(JSON.parse(this.dataset.p))" data-p="'+data.replace(/'/g,'&#39;')+'" style="cursor:pointer;padding:2px 8px;background:var(--accent-bg);border-radius:10px;color:var(--accent);margin:2px;display:inline-block">'+p.Name+'</span>';
+  }).join('');
+}
+
+function setRadarPlayer(p) {
+  if (typeof p === 'string') p = JSON.parse(p);
+  radarPlayer = p;
+  $('radar-search').value = p.Name;
+  $('radar-results').innerHTML = '';
+  drawRadar();
+}
+
+function drawRadar() {
+  const cvs = $('radar-canvas'); if (!cvs || !radarPlayer) return;
+  const ctx = cvs.getContext('2d');
+  const W = 260, H = 260, cx = W/2, cy = H/2, R = 95;
+  ctx.clearRect(0, 0, W, H);
+
+  const qual = BAT.filter(p => flt(p.AB) >= 10);
+  const stats = [
+    { l: 'AVG', field: 'AVG', low: false },
+    { l: 'OBP', field: 'OBP', low: false },
+    { l: 'SLG', field: 'SLG', low: false },
+    { l: 'BB%', field: 'BBpct', low: false },
+    { l: 'K%', field: 'Kpct', low: true },
+    { l: 'Power', field: 'HR', low: false },
+  ];
+  const n = stats.length;
+  const pcts = stats.map(s => (pctRank(radarPlayer[s.field], qual.map(p => p[s.field]), s.low) || 0) / 100);
+
+  // Draw grid rings
+  [0.25, 0.5, 0.75, 1].forEach(ring => {
+    ctx.beginPath();
+    for (let i = 0; i <= n; i++) {
+      const a = (i / n) * Math.PI * 2 - Math.PI / 2;
+      const x = cx + Math.cos(a) * R * ring;
+      const y = cy + Math.sin(a) * R * ring;
+      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    }
+    ctx.closePath();
+    ctx.strokeStyle = ring === 0.5 ? 'rgba(0,87,255,.15)' : 'rgba(0,0,0,.07)';
+    ctx.lineWidth = ring === 0.5 ? 1.5 : 1;
+    ctx.stroke();
+    if (ring === 0.5) {
+      ctx.fillStyle = 'rgba(0,87,255,.04)';
+      ctx.fill();
+    }
+  });
+
+  // Draw spokes
+  stats.forEach((s, i) => {
+    const a = (i / n) * Math.PI * 2 - Math.PI / 2;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(cx + Math.cos(a) * R, cy + Math.sin(a) * R);
+    ctx.strokeStyle = 'rgba(0,0,0,.1)'; ctx.lineWidth = 1;
+    ctx.stroke();
+  });
+
+  // Draw player shape
+  ctx.beginPath();
+  pcts.forEach((pct, i) => {
+    const a = (i / n) * Math.PI * 2 - Math.PI / 2;
+    const x = cx + Math.cos(a) * R * pct;
+    const y = cy + Math.sin(a) * R * pct;
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  });
+  ctx.closePath();
+  ctx.fillStyle = 'rgba(0,87,255,.2)';
+  ctx.fill();
+  ctx.strokeStyle = '#0057ff';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  // Draw dots
+  pcts.forEach((pct, i) => {
+    const a = (i / n) * Math.PI * 2 - Math.PI / 2;
+    const x = cx + Math.cos(a) * R * pct;
+    const y = cy + Math.sin(a) * R * pct;
+    ctx.beginPath(); ctx.arc(x, y, 4, 0, Math.PI * 2);
+    ctx.fillStyle = '#0057ff'; ctx.fill();
+  });
+
+  // Labels
+  stats.forEach((s, i) => {
+    const a = (i / n) * Math.PI * 2 - Math.PI / 2;
+    const lx = cx + Math.cos(a) * (R + 16);
+    const ly = cy + Math.sin(a) * (R + 16);
+    ctx.font = 'bold 11px sans-serif';
+    ctx.fillStyle = '#333';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(s.l, lx, ly);
+  });
+
+  // Legend
+  var legHtml = '<div style="font-weight:700;margin-bottom:6px">'+radarPlayer.Name+'</div>'
+    + '<div style="font-size:11px;color:var(--text3);margin-bottom:10px">'+radarPlayer.Team+'</div>';
+  stats.forEach(function(s, i) {
+    var pct = Math.round(pcts[i] * 100);
+    var col = pct >= 75 ? '#008044' : pct <= 25 ? '#cc2200' : '#888';
+    var val = ['AVG','OBP','SLG'].includes(s.l) ? f3(radarPlayer[s.field])
+            : s.l === 'BB%' ? fpct(radarPlayer.BBpct)
+            : s.l === 'K%'  ? fpct(radarPlayer.Kpct)
+            : radarPlayer[s.field];
+    legHtml += '<div style="display:flex;justify-content:space-between;gap:16px;margin-bottom:4px">'
+      + '<span style="color:var(--text3)">'+s.l+'</span>'
+      + '<span style="font-weight:700">'+val+' <span style="color:'+col+';font-size:10px">P'+pct+'</span></span>'
+      + '</div>';
+  });
+  $('radar-legend').innerHTML = legHtml;
+}
+
+function rAnalytics() {
+  rWAR();
+  rRace();
+  // Canvas needs a tick for layout to settle
+  setTimeout(function() {
+    rTeamScatter();
+    rDiscScatter();
+  }, 50);
+}
+
 // ── Load all data ──
 async function loadAll() {
   $('dot').className='dot';
@@ -759,8 +1257,40 @@ function init() {
   const pavg=f=>PIT.reduce((s,p)=>s+flt(p[f]),0)/Math.max(PIT.length,1);
   lgPitAvg={ERA:pavg('ERA'),WHIP:pavg('WHIP'),BAVG:pavg('BAVG'),SO:pavg('SO'),
     IP:pavg('IP'),W:pavg('W'),BB:pavg('BB'),ER:pavg('ER'),H:pavg('H'),SV:pavg('SV'),_n:PIT.length};
+  // ── Calculate WAR for all players ──
+  const RUN_WIN=8; // tuned for Division 5 run environment — spreads WAR values
+  const replOBP=lgAvg.OBP*0.87, replSLG=lgAvg.SLG*0.87;
+  const replRuns=((replOBP-lgAvg.OBP)*1.8+(replSLG-lgAvg.SLG)*0.7);
+  const lgAB = lgAvg.AB || 60;
+  BAT.forEach(p=>{
+    const obp=flt(p.OBP),slg=flt(p.SLG),ab=flt(p.AB),sb=flt(p.SB);
+    if(ab<10){p.WAR=null;return;}
+    const scale=ab/lgAB;
+    const wRAA=((obp-lgAvg.OBP)*1.8+(slg-lgAvg.SLG)*0.7)*scale;
+    const bsR=sb*0.2;
+    const repl=replRuns*scale;
+    p.WAR=Math.round((wRAA+bsR-repl)/RUN_WIN*10)/10;
+  });
+  // Replacement level = league ERA + 2 runs (fixed gap, not percentage)
+  // Higher RUN_WIN divisor (12) accounts for shorter/higher-scoring division
+  const replERA=lgPitAvg.ERA ? lgPitAvg.ERA+2.0 : 8.0;
+  const PIT_RUN_WIN=12;
+  PIT.forEach(p=>{
+    const era=flt(p.ERA),ip=flt(p.IP);
+    if(ip<10){p.WAR=null;return;}
+    const runsAboveRepl=(replERA-era)/9*ip;
+    // Cap at 0.5 WAR per 4 innings to prevent outliers in short seasons
+    const maxWAR=ip/4*0.5;
+    p.WAR=Math.round(Math.min(runsAboveRepl/PIT_RUN_WIN, maxWAR)*10)/10;
+  });
+
   bPg=0;pPg=0;cPg=0;pcPg=0;
-  rBat();rPit();rCmp();rPCmp();rTGrid();rLAvg();rSlots();rPSlots();rLeaderboard();rTeamsBrowser();
+  rBat();rPit();rCmp();rPCmp();rTGrid();rSlots();rPSlots();rLeaderboard();rTeamsBrowser();
+  // Update home card counts
+  if($('hc-bat')) $('hc-bat').textContent = BAT.length + ' batters';
+  if($('hc-pit')) $('hc-pit').textContent = PIT.length + ' pitchers';
+  // Start on home
+  show('home');
   loadStandings(); // build from TBAT sheet (already loaded)
 
   $('bat-loader').style.display='none'; $('bat-content').style.display='block';
@@ -770,10 +1300,15 @@ function init() {
 function show(id) {
   document.querySelectorAll('.panel,.tab').forEach(e=>e.classList.remove('active'));
   const p=$('p-'+id),t=$('tab-'+id);if(p)p.classList.add('active');if(t)t.classList.add('active');
+  // Tab-specific rendering
+  if(id==='lavg'){rLAvg();}
+  if(id==='analytics'){
+    // analytics tab loaded
+  }
 }
 
 // ── Batting ──
-const BAT_DEFAULT_DIR={SO:1,Kpct:1};
+const BAT_DEFAULT_DIR={SO:1,Kpct:1,WAR:-1};
 function sby(f){
   if(bSort===f) bDir*=-1; else{bSort=f;bDir=BAT_DEFAULT_DIR[f]||(-1);}
   bPg=0;
@@ -803,6 +1338,7 @@ function rBat(){
     <td>${p.SB}</td><td>${p.BB}</td><td>${p.SO}</td>
     <td>${fpct(p.BBpct)}</td><td>${fpct(p.Kpct)}</td>
     <td class="hl">${f3(p.AVG)}</td><td>${f3(p.OBP)}</td><td>${f3(p.SLG)}</td><td>${f3(p.OPS)}</td>
+    <td style="font-weight:700;color:${p.WAR===null?'var(--text3)':flt(p.WAR)>=2?'#008044':flt(p.WAR)>=1?'#0057ff':flt(p.WAR)>=0?'var(--text2)':'#cc2200'}">${p.WAR===null?'—':((p.WAR>0?'+':'')+p.WAR)}</td>
     <td><button class="addbtn" onclick='addCmp(${JSON.stringify({Name:p.Name,Team:p.Team,AVG:p.AVG,OBP:p.OBP,SLG:p.SLG,OPS:p.OPS,H:p.H,HR:p.HR,RBI:p.RBI,R:p.R,SB:p.SB,BB:p.BB,SO:p.SO,AB:p.AB,BBpct:p.BBpct,Kpct:p.Kpct})});show("cmp")'>+ Compare</button></td>
   </tr>`).join('');
 }
@@ -823,7 +1359,8 @@ function spy(f){
 function ppg(d){pPg=Math.max(0,pPg+d);rPit();}
 function rPit(){
   const asc=pDir===1,q=$('psrch').value.toLowerCase(),tm=$('pteam').value;
-  pFil=PIT.filter(p=>(!tm||p.Team===tm)&&(!q||p.Name.toLowerCase().includes(q)))
+  const pqual=$('pqual')&&$('pqual').checked;
+  pFil=PIT.filter(p=>(!pqual||flt(p.IP)>=10)&&(!tm||p.Team===tm)&&(!q||p.Name.toLowerCase().includes(q)))
           .sort((a,b)=>asc?flt(a[pSort])-flt(b[pSort]):flt(b[pSort])-flt(a[pSort]));
   if(pPg*25>=pFil.length&&pPg>0)pPg=0;
   const s=pPg*25,e=s+25,pg=pFil.slice(s,e);
@@ -836,6 +1373,7 @@ function rPit(){
     <td>${p.APP}</td><td>${p.GS}</td><td>${p.W}</td><td>${p.L}</td><td>${p.SV}</td>
     <td>${p.IP}</td><td>${p.H}</td><td>${p.ER}</td><td>${p.BB}</td><td>${p.SO}</td>
     <td class="hl">${f2(p.ERA)}</td><td>${f2(p.WHIP)}</td><td>${f3(p.BAVG)}</td>
+    <td style="font-weight:700;color:${p.WAR===null?'var(--text3)':flt(p.WAR)>=2?'#008044':flt(p.WAR)>=1?'#0057ff':flt(p.WAR)>=0?'var(--text2)':'#cc2200'}">${p.WAR===null?'—':((p.WAR>0?'+':'')+p.WAR)}</td>
     <td><button class="addbtn" onclick='addPCmp(${JSON.stringify({Name:p.Name,Team:p.Team,ERA:p.ERA,WHIP:p.WHIP,BAVG:p.BAVG,SO:p.SO,IP:p.IP,W:p.W,L:p.L,SV:p.SV,BB:p.BB,ER:p.ER,H:p.H,APP:p.APP})});show("pcmp")'>+ Compare</button></td>
   </tr>`).join('');
 }
@@ -1000,6 +1538,7 @@ function rPCmp(){
     <td>${p.APP}</td><td>${p.W}</td><td>${p.L}</td><td>${p.SV}</td>
     <td>${p.IP}</td><td>${p.SO}</td><td>${p.BB}</td>
     <td class="hl">${f2(p.ERA)}</td><td>${f2(p.WHIP)}</td><td>${f3(p.BAVG)}</td>
+    <td style="font-weight:700;color:${p.WAR===null?'var(--text3)':flt(p.WAR)>=2?'#008044':flt(p.WAR)>=1?'#0057ff':flt(p.WAR)>=0?'var(--text2)':'#cc2200'}">${p.WAR===null?'—':((p.WAR>0?'+':'')+p.WAR)}</td>
     <td><button class="addbtn" onclick='addPCmp(${JSON.stringify({Name:p.Name,Team:p.Team,ERA:p.ERA,WHIP:p.WHIP,BAVG:p.BAVG,SO:p.SO,IP:p.IP,W:p.W,L:p.L,SV:p.SV,BB:p.BB,ER:p.ER,H:p.H,APP:p.APP})});show("pcmp")'>+ Compare</button></td>
   </tr>`).join('');
 }
@@ -1642,6 +2181,7 @@ function openBatCard(p){
         ${pctBarRow('HR',p.HR,p.HR,bpct('HR'))}
         ${pctBarRow('RBI',p.RBI,p.RBI,bpct('RBI'))}
         ${pctBarRow('SB',p.SB,p.SB,bpct('SB'))}
+        ${p.WAR!==null?pctBarRow('WAR',p.WAR,(p.WAR>0?'+':'')+p.WAR,bpct('WAR')):''}
       </div>
     </div>
     <div style="border-top:1px solid var(--border2);padding-top:12px">
@@ -1684,6 +2224,7 @@ function openPitCard(p){
         ${pctBarRow('BAA',p.BAVG,f3(p.BAVG),ppct('BAVG',true),true)}
         ${pctBarRow('K',p.SO,p.SO,ppct('SO'))}
         ${pctBarRow('BB',p.BB,p.BB,ppct('BB',true),true)}
+        ${p.WAR!==null?pctBarRow('WAR',p.WAR,(p.WAR>0?'+':'')+p.WAR,ppct('WAR')):''}
       </div>
     </div>
     <div style="border-top:1px solid var(--border2);padding-top:12px">
