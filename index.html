@@ -191,16 +191,17 @@ tr:hover td{background:#fafaf8}
 .pn-link:hover{color:var(--accent);border-color:var(--accent)}
 
 /* ── Standings ── */
-.standings-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:1rem}
+.standings-grid{display:flex;flex-direction:column;gap:1rem}
 .division-card{border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
 .division-hdr{background:var(--accent);color:#fff;padding:8px 12px;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.06em}
 .div-table{width:100%;font-size:12px;border-collapse:collapse}
-.div-table th{padding:5px 8px;font-size:10px;font-weight:700;color:var(--text3);border-bottom:1px solid var(--border);background:#fafaf8;text-align:center}
-.div-table th:first-child{text-align:left}
-.div-table td{padding:5px 8px;border-bottom:1px solid var(--border2);text-align:center}
+.div-table th{padding:6px 10px;font-size:10px;font-weight:700;color:var(--text3);border-bottom:1px solid var(--border);background:#fafaf8;text-align:center}
+.div-table th:first-child{text-align:left;width:100%}
+.div-table td{padding:6px 10px;border-bottom:1px solid var(--border2);text-align:center;white-space:nowrap}
 .div-table tr:last-child td{border-bottom:none}
-.div-table td:first-child{text-align:left;font-weight:700}
+.div-table td:first-child{text-align:left;font-weight:700;width:100%}
 .div-table tr:hover td{background:#fafaf8}
+.div-table th:not(:first-child),.div-table td:not(:first-child){width:52px;min-width:52px}
 .rank-num{color:var(--text3);font-size:10px;font-weight:400;margin-right:4px}
 .team-link{cursor:pointer;border-bottom:1px dashed var(--border);transition:color .15s;font-size:12px}
 .team-link:hover{color:var(--accent)}
@@ -377,7 +378,7 @@ tr:hover td{background:#fafaf8}
           <th onclick="spy('BB')">BB</th><th onclick="spy('SO')">K</th>
           <th onclick="spy('ERA')" class="s">ERA ↑</th>
           <th onclick="spy('WHIP')">WHIP</th>
-          <th onclick="spy('BAA')">BAA</th>
+          <th onclick="spy('BAVG')">BAA</th>
         </tr></thead>
         <tbody id="pbody"></tbody>
       </table></div>
@@ -725,7 +726,7 @@ async function loadAll() {
     if(ROSTERS.length)  extras.push(`${ROSTERS.length} roster entries`);
     if(FIXTURES.length) extras.push(`${FIXTURES.length} fixtures`);
     const extraStr = extras.length ? ' · ' + extras.join(' · ') : '';
-    $('stxt').textContent=`Live · ${BAT.length} batters · ${PIT.length} pitchers${extraStr} · ${ts}`;
+    $('stxt').textContent=`Live · Updated ${ts}`;
     $('bat-updated').textContent=`Last updated: ${ts}`;
     $('pit-updated').textContent=`Last updated: ${ts}`;
     init();
@@ -756,7 +757,7 @@ function init() {
     H:avg('H'),HR:avg('HR'),RBI:avg('RBI'),R:avg('R'),SB:avg('SB'),
     BB:avg('BB'),SO:avg('SO'),AB:avg('AB'),BBpct:avg('BBpct'),Kpct:avg('Kpct'),_n:qual.length};
   const pavg=f=>PIT.reduce((s,p)=>s+flt(p[f]),0)/Math.max(PIT.length,1);
-  lgPitAvg={ERA:pavg('ERA'),WHIP:pavg('WHIP'),BAA:pavg('BAA'),SO:pavg('SO'),
+  lgPitAvg={ERA:pavg('ERA'),WHIP:pavg('WHIP'),BAVG:pavg('BAVG'),SO:pavg('SO'),
     IP:pavg('IP'),W:pavg('W'),BB:pavg('BB'),ER:pavg('ER'),H:pavg('H'),SV:pavg('SV'),_n:PIT.length};
   bPg=0;pPg=0;cPg=0;pcPg=0;
   rBat();rPit();rCmp();rPCmp();rTGrid();rLAvg();rSlots();rPSlots();rLeaderboard();rTeamsBrowser();
@@ -807,7 +808,7 @@ function rBat(){
 }
 
 // ── Pitching ──
-const PIT_DEFAULT_DIR={ERA:1,WHIP:1,BAA:1,H:1,ER:1,BB:1,L:1};
+const PIT_DEFAULT_DIR={ERA:1,WHIP:1,BAVG:1,H:1,ER:1,BB:1,L:1};
 function spy(f){
   if(pSort===f) pDir*=-1; else{pSort=f;pDir=PIT_DEFAULT_DIR[f]||(-1);}
   pPg=0;
@@ -834,26 +835,36 @@ function rPit(){
     <td><span class="tm-badge">${p.Team}</span></td>
     <td>${p.APP}</td><td>${p.GS}</td><td>${p.W}</td><td>${p.L}</td><td>${p.SV}</td>
     <td>${p.IP}</td><td>${p.H}</td><td>${p.ER}</td><td>${p.BB}</td><td>${p.SO}</td>
-    <td class="hl">${f2(p.ERA)}</td><td>${f2(p.WHIP)}</td><td>${f3(p.BAA)}</td>
-    <td><button class="addbtn" onclick='addPCmp(${JSON.stringify({Name:p.Name,Team:p.Team,ERA:p.ERA,WHIP:p.WHIP,BAA:p.BAA,SO:p.SO,IP:p.IP,W:p.W,L:p.L,SV:p.SV,BB:p.BB,ER:p.ER,H:p.H,APP:p.APP})});show("pcmp")'>+ Compare</button></td>
+    <td class="hl">${f2(p.ERA)}</td><td>${f2(p.WHIP)}</td><td>${f3(p.BAVG)}</td>
+    <td><button class="addbtn" onclick='addPCmp(${JSON.stringify({Name:p.Name,Team:p.Team,ERA:p.ERA,WHIP:p.WHIP,BAVG:p.BAVG,SO:p.SO,IP:p.IP,W:p.W,L:p.L,SV:p.SV,BB:p.BB,ER:p.ER,H:p.H,APP:p.APP})});show("pcmp")'>+ Compare</button></td>
   </tr>`).join('');
 }
 
 // ── Bar row renderer ──
 function barRow(s) {
-  const mx=s.sc||Math.max(s.a,s.b,s.lg!=null?s.lg:0,0.001);
-  const pA=Math.round(s.a/mx*100),pB=Math.round(s.b/mx*100);
-  const pLg=s.lg!=null?Math.round(s.lg/mx*100):null;
   const aw=s.low?s.a<s.b:s.a>s.b, bw=s.low?s.b<s.a:s.b>s.a;
-  const lgMarker=pLg!=null?`<div class="lavg-marker" style="left:${pLg}%"></div>`:'';
-  const lgLabel=pLg!=null?`<br><span style="color:#bbb;font-size:9px">${s.f(s.lg)}</span>`:'';
-  return `<div class="brow">
-    <span class="bv${aw?' w':bw?' wbad':''}">${s.f(s.a)}</span>
-    <div class="bwrap bleft" style="position:relative"><div class="bf" style="width:${pA}%"></div>${lgMarker}</div>
-    <div class="blbl">${s.l}${lgLabel}</div>
-    <div class="bwrap bright" style="position:relative"><div class="bf" style="width:${pB}%"></div>${lgMarker}</div>
-    <span class="bv right${bw?' w':aw?' wbad':''}">${s.f(s.b)}</span>
-  </div>`;
+  const mx=s.sc||Math.max(s.a,s.b,s.lg!=null?s.lg:0,0.001);
+  const pA=Math.min(100,Math.round(s.a/mx*100));
+  const pB=Math.min(100,Math.round(s.b/mx*100));
+  const pLg=s.lg!=null?Math.min(100,Math.round(s.lg/mx*100)):null;
+  const colA=aw?'#008044':bw?'#cc2200':'#0057ff';
+  const colB=bw?'#008044':aw?'#cc2200':'#e85d00';
+  const mkA=pLg!=null?'<div style="position:absolute;right:'+(100-pLg)+'%;top:0;width:3px;height:100%;background:rgba(255,255,255,0.9);z-index:4;border-left:1px solid rgba(0,0,0,0.5);border-right:1px solid rgba(0,0,0,0.5)"></div>':'';
+  const mkB=pLg!=null?'<div style="position:absolute;left:'+pLg+'%;top:0;width:3px;height:100%;background:rgba(255,255,255,0.9);z-index:4;border-left:1px solid rgba(0,0,0,0.5);border-right:1px solid rgba(0,0,0,0.5)"></div>':'';
+  const lgVal=pLg!=null?'<div style="font-size:9px;color:var(--text3);font-weight:700;margin-top:3px;text-align:center">Avg '+s.f(s.lg)+'</div>':'';
+  return '<div style="display:grid;grid-template-columns:72px 1fr 64px 1fr 72px;align-items:center;gap:6px;margin-bottom:12px">'
+    + '<div style="text-align:right"><span style="font-size:18px;font-weight:800;color:'+colA+'">'+s.f(s.a)+'</span></div>'
+    + '<div style="position:relative;height:14px;background:var(--border2);border-radius:7px;overflow:hidden">'
+    + '<div style="position:absolute;right:0;top:0;height:100%;width:'+pA+'%;background:'+colA+';border-radius:7px"></div>'
+    + mkA
+    + '</div>'
+    + '<div style="text-align:center"><div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.04em">'+s.l+'</div>'+lgVal+'</div>'
+    + '<div style="position:relative;height:14px;background:var(--border2);border-radius:7px;overflow:hidden">'
+    + '<div style="position:absolute;left:0;top:0;height:100%;width:'+pB+'%;background:'+colB+';border-radius:7px"></div>'
+    + mkB
+    + '</div>'
+    + '<div style="text-align:left"><span style="font-size:18px;font-weight:800;color:'+colB+'">'+s.f(s.b)+'</span></div>'
+    + '</div>';
 }
 
 // ── Compare batters ──
@@ -890,6 +901,10 @@ function rSlots(){
   $('barsec').style.display='block';
   $('bat-name-left').textContent=slA.Name;
   $('bat-name-right').textContent=slB.Name;
+  // Update colours in name headers
+  const leftHdr=$('bat-name-left'), rightHdr=$('bat-name-right');
+  if(leftHdr) leftHdr.style.color='#0057ff';
+  if(rightHdr) rightHdr.style.color='#e85d00';
   const stats=[
     {l:'AVG',a:flt(slA.AVG),b:flt(slB.AVG),lg:lgAvg.AVG,f:f3},
     {l:'OBP',a:flt(slA.OBP),b:flt(slB.OBP),lg:lgAvg.OBP,f:f3},
@@ -939,7 +954,7 @@ function rPSlots(){
     cont.innerHTML=`<div class="slot-name">${pl.Name}</div><div class="slot-team">${pl.Team}</div>
     <div class="sg">${[['ERA',f2(pl.ERA),pp('ERA',true)],['WHIP',f2(pl.WHIP),pp('WHIP',true)],['K',pl.SO,pp('SO')],
       ['IP',pl.IP,pp('IP')],['W',pl.W,pp('W')],['BB',pl.BB,pp('BB',true)],
-      ['SV',pl.SV,pp('SV')],['ER',pl.ER,pp('ER',true)],['BAA',f3(pl.BAA),pp('BAA',true)]
+      ['SV',pl.SV,pp('SV')],['ER',pl.ER,pp('ER',true)],['BAVG',f3(pl.BAVG),pp('BAVG',true)]
     ].map(([l,v,b])=>`<div class="sg-cell"><div class="l">${l}</div><div class="v">${v}${b||''}</div></div>`).join('')}</div>`;
   };
   render(pslA,'pslotA','pslotAc');render(pslB,'pslotB','pslotBc');
@@ -948,17 +963,20 @@ function rPSlots(){
     lgc.innerHTML=`<div class="slot-name" style="color:var(--text2);font-size:13px">Division 5</div><div class="slot-team">${lgPitAvg._n} pitchers</div>
     <div class="sg">${[['ERA',f2(lgPitAvg.ERA)],['WHIP',f2(lgPitAvg.WHIP)],['K',lgPitAvg.SO.toFixed(1)],
       ['IP',lgPitAvg.IP.toFixed(1)],['W',lgPitAvg.W.toFixed(1)],['BB',lgPitAvg.BB.toFixed(1)],
-      ['SV',lgPitAvg.SV.toFixed(1)],['ER',lgPitAvg.ER.toFixed(1)],['BAA',f3(lgPitAvg.BAA)]
+      ['SV',lgPitAvg.SV.toFixed(1)],['ER',lgPitAvg.ER.toFixed(1)],['BAVG',f3(lgPitAvg.BAVG)]
     ].map(([l,v])=>`<div class="sg-cell"><div class="l">${l}</div><div class="v" style="color:var(--text3)">${v}</div></div>`).join('')}</div>`;
   }
   if(!pslA||!pslB){$('pbarsec').style.display='none';return;}
   $('pbarsec').style.display='block';
   $('pit-name-left').textContent=pslA.Name;
   $('pit-name-right').textContent=pslB.Name;
+  const pleftHdr=$('pit-name-left'), prightHdr=$('pit-name-right');
+  if(pleftHdr) pleftHdr.style.color='#0057ff';
+  if(prightHdr) prightHdr.style.color='#e85d00';
   const stats=[
     {l:'ERA',a:flt(pslA.ERA),b:flt(pslB.ERA),lg:lgPitAvg.ERA,f:f2,low:true},
     {l:'WHIP',a:flt(pslA.WHIP),b:flt(pslB.WHIP),lg:lgPitAvg.WHIP,f:f2,low:true},
-    {l:'BAA',a:flt(pslA.BAA),b:flt(pslB.BAA),lg:lgPitAvg.BAA,f:f3,low:true},
+    {l:'BAVG',a:flt(pslA.BAVG),b:flt(pslB.BAVG),lg:lgPitAvg.BAVG,f:f3,low:true},
     {l:'K',a:flt(pslA.SO),b:flt(pslB.SO),lg:lgPitAvg.SO,f:v=>Math.round(v)},
     {l:'IP',a:flt(pslA.IP),b:flt(pslB.IP),lg:lgPitAvg.IP,f:v=>parseFloat(v).toFixed(1)},
     {l:'W',a:flt(pslA.W),b:flt(pslB.W),lg:lgPitAvg.W,f:v=>Math.round(v)},
@@ -981,8 +999,8 @@ function rPCmp(){
     <td><span class="pn">${p.Name}</span></td><td><span class="tm-badge">${p.Team}</span></td>
     <td>${p.APP}</td><td>${p.W}</td><td>${p.L}</td><td>${p.SV}</td>
     <td>${p.IP}</td><td>${p.SO}</td><td>${p.BB}</td>
-    <td class="hl">${f2(p.ERA)}</td><td>${f2(p.WHIP)}</td><td>${f3(p.BAA)}</td>
-    <td><button class="addbtn" onclick='addPCmp(${JSON.stringify({Name:p.Name,Team:p.Team,ERA:p.ERA,WHIP:p.WHIP,BAA:p.BAA,SO:p.SO,IP:p.IP,W:p.W,L:p.L,SV:p.SV,BB:p.BB,ER:p.ER,H:p.H,APP:p.APP})});show("pcmp")'>+ Compare</button></td>
+    <td class="hl">${f2(p.ERA)}</td><td>${f2(p.WHIP)}</td><td>${f3(p.BAVG)}</td>
+    <td><button class="addbtn" onclick='addPCmp(${JSON.stringify({Name:p.Name,Team:p.Team,ERA:p.ERA,WHIP:p.WHIP,BAVG:p.BAVG,SO:p.SO,IP:p.IP,W:p.W,L:p.L,SV:p.SV,BB:p.BB,ER:p.ER,H:p.H,APP:p.APP})});show("pcmp")'>+ Compare</button></td>
   </tr>`).join('');
 }
 
@@ -1064,7 +1082,7 @@ function rLAvg(){
     ['Walks (avg)',lgAvg.BB.toFixed(1)],['Strikeouts (avg)',lgAvg.SO.toFixed(1)],['At bats (avg)',lgAvg.AB.toFixed(1)]];
   $('lavg-bat').innerHTML=`<div style="font-size:11px;color:var(--text3);margin-bottom:8px">Based on ${lgAvg._n} qualified batters (min 10 AB)</div>`+
     batStats.map(([l,v])=>`<div class="lavg-row"><span class="lavg-label">${l}</span><span class="lavg-val">${v}</span></div>`).join('');
-  const pitStats=[['ERA',f2(lgPitAvg.ERA)],['WHIP',f2(lgPitAvg.WHIP)],['Bat avg against',f3(lgPitAvg.BAA)],
+  const pitStats=[['ERA',f2(lgPitAvg.ERA)],['WHIP',f2(lgPitAvg.WHIP)],['Bat avg against',f3(lgPitAvg.BAVG)],
     ['Strikeouts (avg)',lgPitAvg.SO.toFixed(1)],['Innings pitched (avg)',lgPitAvg.IP.toFixed(1)],
     ['Walks (avg)',lgPitAvg.BB.toFixed(1)],['Wins (avg)',lgPitAvg.W.toFixed(2)],
     ['Saves (avg)',lgPitAvg.SV.toFixed(2)],['Earned runs (avg)',lgPitAvg.ER.toFixed(1)],
@@ -1126,7 +1144,7 @@ function rLeaderboard(){
   const PIT_CATS=[
     {key:'ERA',label:'ERA',f:f2,desc:true,sub:'lower is better'},
     {key:'WHIP',label:'WHIP',f:f2,desc:true,sub:'lower is better'},
-    {key:'BAA',label:'Batting Avg Against',f:f3,desc:true,sub:'lower is better'},
+    {key:'BAVG',label:'Batting Avg Against',f:f3,desc:true,sub:'lower is better'},
     {key:'SO',label:'Strikeouts',f:v=>+v,desc:false},
     {key:'IP',label:'Innings Pitched',f:v=>parseFloat(v).toFixed(1),desc:false},
     {key:'W',label:'Wins',f:v=>+v,desc:false},
@@ -1241,7 +1259,7 @@ function renderStandings(){
         <tbody>${d.rows.map((r,i) => `<tr>
           <td><span class="rank-num">${r.rank||i+1}</span><span class="team-link" onclick="goToTeam('${(r.name||'').replace(/'/g,"\'")}')">${r.name}</span></td>
           ${hasWL
-            ? `<td style="font-weight:700">${r.W}</td><td>${r.L}</td><td>${r.T||0}</td><td style="font-weight:800;color:var(--accent)">${r.pct}</td><td style="color:var(--text3)">${r.GB}</td>`
+            ? `<td style="font-weight:700">${r.W}</td><td>${r.L}</td><td>${r.T||0}</td><td style="font-weight:800;color:var(--accent)">${parseFloat(r.pct||0).toFixed(3)}</td><td style="color:var(--text3)">${r.GB}</td>`
             : `<td>${f3(r.AVG)}</td><td>${f3(r.OPS)}</td>`}
         </tr>`).join('')}</tbody>
       </table>
@@ -1571,7 +1589,7 @@ function renderTeamPage(name, meta, teamBat, teamPit){
       <td style="padding:5px 8px;border-bottom:1px solid var(--border2)">${p.BB}</td>
       <td style="padding:5px 8px;border-bottom:1px solid var(--border2);color:var(--green);font-weight:700">${f2(p.ERA)}</td>
       <td style="padding:5px 8px;border-bottom:1px solid var(--border2)">${f2(p.WHIP)}</td>
-      <td style="padding:5px 8px;border-bottom:1px solid var(--border2)"><button class="addbtn" onclick='addPCmp(${JSON.stringify({Name:p.Name,Team:p.Team,ERA:p.ERA,WHIP:p.WHIP,BAA:p.BAA,SO:p.SO,IP:p.IP,W:p.W,L:p.L,SV:p.SV,BB:p.BB,ER:p.ER,H:p.H,APP:p.APP})});show("pcmp")'>+ Compare</button></td>
+      <td style="padding:5px 8px;border-bottom:1px solid var(--border2)"><button class="addbtn" onclick='addPCmp(${JSON.stringify({Name:p.Name,Team:p.Team,ERA:p.ERA,WHIP:p.WHIP,BAVG:p.BAVG,SO:p.SO,IP:p.IP,W:p.W,L:p.L,SV:p.SV,BB:p.BB,ER:p.ER,H:p.H,APP:p.APP})});show("pcmp")'>+ Compare</button></td>
     </tr>`).join('')}</tbody>
   </table>`:`<div style="font-size:12px;color:var(--text3);padding:.5rem">No pitching data in sheet for this team.</div>`;
 
@@ -1588,41 +1606,106 @@ function backToTeams(){
 function closeModal(){$('modal').style.display='none';document.body.style.overflow='';}
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal();});
 
+function pctBarRow(label, value, displayVal, pct, low=false) {
+  if(pct===null) pct=50;
+  const color = low
+    ? (pct<=25?'#008044':pct>=75?'#cc2200':'#888')
+    : (pct>=75?'#008044':pct<=25?'#cc2200':'#888');
+  const barPct = pct;
+  return `<div style="display:grid;grid-template-columns:90px 1fr 48px;align-items:center;gap:8px;margin-bottom:7px">
+    <div style="font-size:11px;color:var(--text3);font-weight:600;text-align:right">${label}</div>
+    <div style="position:relative;height:8px;background:var(--border2);border-radius:4px;overflow:hidden">
+      <div style="position:absolute;left:0;top:0;height:100%;width:${barPct}%;background:${color};border-radius:4px;transition:width .4s"></div>
+      <div style="position:absolute;left:50%;top:-2px;width:1px;height:12px;background:var(--border);"></div>
+    </div>
+    <div style="font-size:13px;font-weight:800;color:${color};text-align:right">${displayVal}</div>
+  </div>`;
+}
+
 function openBatCard(p){
   const qual=BAT.filter(x=>flt(x.AB)>=10);
-  const bp=(field,low=false)=>pctBadge(pctRank(p[field],qual.map(x=>x[field]),low));
+  const bpct=(field,low=false)=>pctRank(p[field],qual.map(x=>x[field]),low);
+  const initials=p.Name.split(' ').map(w=>w[0]||'').join('').substring(0,2).toUpperCase();
   $('modal-name').textContent=p.Name;
-  $('modal-team').innerHTML=`<span class="tm-badge">${p.Team}</span><span style="color:#ddd">·</span><span>${p.G} games · ${p.AB} AB</span>`;
+  $('modal-team').innerHTML=`<span class="tm-badge">${p.Team}</span><span style="color:var(--text3)">·</span><span>${p.POS||''}</span><span style="color:var(--text3)">·</span><span>${p.G} G · ${p.AB} AB · ${p.BT||''}</span>`;
   $('modal-body').innerHTML=`
-    <div class="modal-section">Batting rate stats</div>
-    <div class="modal-grid">${[['AVG',f3(p.AVG),bp('AVG')],['OBP',f3(p.OBP),bp('OBP')],['SLG',f3(p.SLG),bp('SLG')],
-      ['OPS',f3(p.OPS),bp('OPS')],['BB%',fpct(p.BBpct),bp('BBpct')],['K%',fpct(p.Kpct),bp('Kpct',true)]
-    ].map(([l,v,b])=>`<div class="modal-stat"><div class="modal-stat-label">${l}</div><div class="modal-stat-val">${v}${b}</div></div>`).join('')}</div>
-    <div class="modal-section">Counting stats</div>
-    <div class="modal-grid">${[['H',p.H,bp('H')],['2B',p['2B'],''],['3B',p['3B'],''],['HR',p.HR,bp('HR')],
-      ['RBI',p.RBI,bp('RBI')],['R',p.R,bp('R')],['SB',p.SB,bp('SB')],['BB',p.BB,bp('BB')],['SO',p.SO,bp('SO',true)]
-    ].map(([l,v,b])=>`<div class="modal-stat"><div class="modal-stat-label">${l}</div><div class="modal-stat-val">${v}${b}</div></div>`).join('')}</div>`;
+    <div style="display:flex;gap:16px;align-items:flex-start;margin-bottom:16px">
+      <div style="width:52px;height:52px;border-radius:50%;background:var(--accent-bg);display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:800;color:var(--accent);flex-shrink:0">${initials}</div>
+      <div style="flex:1">
+        <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Percentile rankings — Division 5 2026</div>
+        ${pctBarRow('AVG',p.AVG,f3(p.AVG),bpct('AVG'))}
+        ${pctBarRow('OBP',p.OBP,f3(p.OBP),bpct('OBP'))}
+        ${pctBarRow('SLG',p.SLG,f3(p.SLG),bpct('SLG'))}
+        ${pctBarRow('OPS',p.OPS,f3(p.OPS),bpct('OPS'))}
+        ${pctBarRow('BB%',p.BBpct,fpct(p.BBpct),bpct('BBpct'))}
+        ${pctBarRow('K%',p.Kpct,fpct(p.Kpct),bpct('Kpct',true),true)}
+        ${pctBarRow('HR',p.HR,p.HR,bpct('HR'))}
+        ${pctBarRow('RBI',p.RBI,p.RBI,bpct('RBI'))}
+        ${pctBarRow('SB',p.SB,p.SB,bpct('SB'))}
+      </div>
+    </div>
+    <div style="border-top:1px solid var(--border2);padding-top:12px">
+      <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Counting stats</div>
+      <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:6px">
+        ${[['H',p.H,'H'],['2B',p['2B'],'2B'],['3B',p['3B'],'3B'],['HR',p.HR,'HR'],['RBI',p.RBI,'RBI'],
+           ['R',p.R,'R'],['SB',p.SB,'SB'],['BB',p.BB,'BB'],['SO',p.SO,'SO'],['G',p.G,null]
+          ].map(([l,v,f])=>{
+            const pct=f?bpct(f,f==='SO'):null;
+            const col=pct===null?'var(--text2)':pct>=75?'#008044':pct<=25?'#cc2200':'var(--text2)';
+            const bg=pct===null?'var(--bg2)':pct>=75?'rgba(0,128,68,.08)':pct<=25?'rgba(204,34,0,.06)':'var(--bg2)';
+            const badge=pct!==null?`<div style="font-size:9px;font-weight:700;color:${col};margin-top:2px">P${pct}</div>`:'';
+            return `<div style="background:${bg};border-radius:var(--radius-sm);padding:8px 6px;text-align:center;border:1px solid ${pct>=75?'rgba(0,128,68,.2)':pct<=25?'rgba(204,34,0,.1)':'var(--border2)'}">
+              <div style="font-size:9px;font-weight:700;color:var(--text3);margin-bottom:3px">${l}</div>
+              <div style="font-size:18px;font-weight:800;color:${col};line-height:1">${v||0}</div>
+              ${badge}
+            </div>`;
+          }).join('')}
+      </div>
+    </div>`;
   $('modal-actions').innerHTML=`
     <button class="modal-btn modal-btn-cmp" onclick='addCmp(${JSON.stringify({Name:p.Name,Team:p.Team,AVG:p.AVG,OBP:p.OBP,SLG:p.SLG,OPS:p.OPS,H:p.H,HR:p.HR,RBI:p.RBI,R:p.R,SB:p.SB,BB:p.BB,SO:p.SO,AB:p.AB,BBpct:p.BBpct,Kpct:p.Kpct})});show("cmp");closeModal()'>+ Add to compare</button>
-    <button class="modal-btn" style="background:#f9f9f7;color:var(--text2);border-color:var(--border)" onclick="closeModal()">Close</button>`;
+    <button class="modal-btn" style="background:var(--bg2);color:var(--text2);border-color:var(--border)" onclick="closeModal()">Close</button>`;
   $('modal').style.display='flex';
   document.body.style.overflow='hidden';
 }
 
 function openPitCard(p){
-  const pp=(field,low=false)=>pctBadge(pctRank(p[field],PIT.map(x=>x[field]),low));
+  const ppct=(field,low=false)=>pctRank(p[field],PIT.map(x=>x[field]),low);
+  const initials=p.Name.split(' ').map(w=>w[0]||'').join('').substring(0,2).toUpperCase();
   $('modal-name').textContent=p.Name;
-  $('modal-team').innerHTML=`<span class="tm-badge">${p.Team}</span><span style="color:#ddd">·</span><span>${p.APP} appearances · ${p.IP} IP</span>`;
+  $('modal-team').innerHTML=`<span class="tm-badge">${p.Team}</span><span style="color:var(--text3)">·</span><span>${p.APP} app · ${p.IP} IP · ${p.BT||''}</span>`;
   $('modal-body').innerHTML=`
-    <div class="modal-section">Key pitching stats</div>
-    <div class="modal-grid">${[['ERA',f2(p.ERA),pp('ERA',true)],['WHIP',f2(p.WHIP),pp('WHIP',true)],['BAA',f3(p.BAA),pp('BAA',true)]]
-      .map(([l,v,b])=>`<div class="modal-stat"><div class="modal-stat-label">${l}</div><div class="modal-stat-val">${v}${b}</div></div>`).join('')}</div>
-    <div class="modal-section">Counting stats</div>
-    <div class="modal-grid">${[['W',p.W,pp('W')],['L',p.L,''],['SV',p.SV,pp('SV')],['K',p.SO,pp('SO')],
-      ['BB',p.BB,pp('BB',true)],['H',p.H,pp('H',true)],['ER',p.ER,pp('ER',true)],['GS',p.GS,''],['CG',p.CG||0,'']]
-      .map(([l,v,b])=>`<div class="modal-stat"><div class="modal-stat-label">${l}</div><div class="modal-stat-val">${v}${b}</div></div>`).join('')}</div>`;
+    <div style="display:flex;gap:16px;align-items:flex-start;margin-bottom:16px">
+      <div style="width:52px;height:52px;border-radius:50%;background:var(--accent-bg);display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:800;color:var(--accent);flex-shrink:0">${initials}</div>
+      <div style="flex:1">
+        <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Percentile rankings — Division 5 2026</div>
+        ${pctBarRow('ERA',p.ERA,f2(p.ERA),ppct('ERA',true),true)}
+        ${pctBarRow('WHIP',p.WHIP,f2(p.WHIP),ppct('WHIP',true),true)}
+        ${pctBarRow('BAA',p.BAVG,f3(p.BAVG),ppct('BAVG',true),true)}
+        ${pctBarRow('K',p.SO,p.SO,ppct('SO'))}
+        ${pctBarRow('BB',p.BB,p.BB,ppct('BB',true),true)}
+      </div>
+    </div>
+    <div style="border-top:1px solid var(--border2);padding-top:12px">
+      <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Counting stats</div>
+      <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:6px">
+        ${[['W',p.W,'W'],['L',p.L,'L'],['SV',p.SV,'SV'],['K',p.SO,'SO'],['BB',p.BB,'BB'],
+           ['H',p.H,'H'],['ER',p.ER,'ER'],['IP',p.IP,null],['GS',p.GS,null],['CG',p.CG||0,null]
+          ].map(([l,v,f])=>{
+            const pct=f?ppct(f,['L','BB','H','ER'].includes(f)):null;
+            const col=pct===null?'var(--text2)':pct>=75?'#008044':pct<=25?'#cc2200':'var(--text2)';
+            const bg=pct===null?'var(--bg2)':pct>=75?'rgba(0,128,68,.08)':pct<=25?'rgba(204,34,0,.06)':'var(--bg2)';
+            const badge=pct!==null?`<div style="font-size:9px;font-weight:700;color:${col};margin-top:2px">P${pct}</div>`:'';
+            return `<div style="background:${bg};border-radius:var(--radius-sm);padding:8px 6px;text-align:center;border:1px solid ${pct>=75?'rgba(0,128,68,.2)':pct<=25?'rgba(204,34,0,.1)':'var(--border2)'}">
+              <div style="font-size:9px;font-weight:700;color:var(--text3);margin-bottom:3px">${l}</div>
+              <div style="font-size:18px;font-weight:800;color:${col};line-height:1">${v||0}</div>
+              ${badge}
+            </div>`;
+          }).join('')}
+      </div>
+    </div>`;
   $('modal-actions').innerHTML=`
-    <button class="modal-btn modal-btn-cmp" onclick='addPCmp(${JSON.stringify({Name:p.Name,Team:p.Team,ERA:p.ERA,WHIP:p.WHIP,BAA:p.BAA,SO:p.SO,IP:p.IP,W:p.W,L:p.L,SV:p.SV,BB:p.BB,ER:p.ER,H:p.H,APP:p.APP})});show("pcmp");closeModal()'>+ Add to compare</button>
+    <button class="modal-btn modal-btn-cmp" onclick='addPCmp(${JSON.stringify({Name:p.Name,Team:p.Team,ERA:p.ERA,WHIP:p.WHIP,BAVG:p.BAVG,SO:p.SO,IP:p.IP,W:p.W,L:p.L,SV:p.SV,BB:p.BB,ER:p.ER,H:p.H,APP:p.APP})});show("pcmp");closeModal()'>+ Add to compare</button>
     <button class="modal-btn" style="background:#f9f9f7;color:var(--text2);border-color:var(--border)" onclick="closeModal()">Close</button>`;
   $('modal').style.display='flex';
   document.body.style.overflow='hidden';
