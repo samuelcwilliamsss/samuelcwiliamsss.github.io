@@ -750,22 +750,20 @@ function calcWAR() {
   // Positional adjustment removed — positions recorded as UTL in this division
   const REPL_OBP = lgAvg.OBP ? lgAvg.OBP * 0.87 : 0.28;
   const REPL_SLG = lgAvg.SLG ? lgAvg.SLG * 0.87 : 0.37;
-  const RUNS_PER_WIN = 9.5;
+  const RUNS_PER_WIN = 2.5;
 
   // Build position lookup from rosters
   // posMap now built in init()
 
   const batWAR = BAT.filter(p => flt(p.AB) >= 10).map(p => {
     const obp = flt(p.OBP), slg = flt(p.SLG), ab = flt(p.AB), sb = flt(p.SB), cs = flt(p.CS);
-    // Weights adjusted for high-scoring Division 5 environment:
-    // Lower OBP multiplier (1.4 vs MLB 1.8) — bases already clogged, getting on less marginal
-    // Higher SLG multiplier (1.0 vs MLB 0.7) — extra bases matter more when everyone reaches
-    const wRAA = ((obp - lgAvg.OBP) * 1.4 + (slg - lgAvg.SLG) * 1.0) * ab / 600;
-    // SB value reduced (0.15 vs 0.2) — stolen bases worth less when scoring is easy anyway
-    // CS now penalised at 0.45 runs — outs more costly when everyone else reaches base
-    const bsR = (sb * 0.15) - (cs * 0.45);
-    const posAdj = 0; // position adjustment removed — all listed as UTL
-    const replRuns = ((REPL_OBP - lgAvg.OBP) * 1.4 + (REPL_SLG - lgAvg.SLG) * 1.0) * ab / 600;
+    const wRAA = ((obp - lgAvg.OBP) * 1.1 + (slg - lgAvg.SLG) * 1.0) * ab / 600;
+    const lgSB = lgAvg.SB || 10.5;
+    const SB_CAP = lgSB * 2 * 0.15;
+    const rawBsR = (sb * 0.15) - (cs * 0.45);
+    const bsR = Math.min(rawBsR, SB_CAP);
+    const posAdj = 0;
+    const replRuns = ((REPL_OBP - lgAvg.OBP) * 1.1 + (REPL_SLG - lgAvg.SLG) * 1.0) * ab / 600;
     const war = wRAA + bsR + posAdj - replRuns;
     return { name: p.Name, team: p.Team, war: Math.round(war * 10) / 10, type: 'bat', pos };
   }).sort((a,b) => b.war - a.war);
@@ -883,7 +881,7 @@ function rWAR() {
   $('war-content').innerHTML = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">'
     + renderList(top10bat, 'Batting WAR')
     + renderList(top10pit, 'Pitching WAR')
-    + '</div><div style="font-size:10px;color:var(--text3);margin-top:8px;border-top:1px solid var(--border2);padding-top:6px">Estimated WAR · Batting: wRAA (OBP×1.4 + SLG×1.0, Div 5 weights) + BsR (SB×0.15 − CS×0.45) vs replacement · Pitching: ERA vs lgERA+2, capped per inning</div>';
+    + '</div><div style="font-size:10px;color:var(--text3);margin-top:8px;border-top:1px solid var(--border2);padding-top:6px">Estimated WAR · Batting: wRAA (OBP×1.1 + SLG×1.0) + BsR (SB×0.15 − CS×0.45, capped at 2× lg avg) vs replacement · Scaled for 24-game season · Pitching: ERA vs lgERA+2, capped per inning</div>';
 }
 
 // ── Team scatter (Offence vs Defence) ──
@@ -1265,21 +1263,22 @@ function init() {
   lgPitAvg={ERA:pavg('ERA'),WHIP:pavg('WHIP'),BAVG:pavg('BAVG'),SO:pavg('SO'),
     IP:pavg('IP'),W:pavg('W'),BB:pavg('BB'),ER:pavg('ER'),H:pavg('H'),SV:pavg('SV'),_n:PIT.length};
   // ── Calculate WAR for all players ──
-  const RUN_WIN=8; // tuned for Division 5 run environment
+  // RUN_WIN=2.5: scaled down from MLB 9.5 to give meaningful values over a 24-game season
+  // OBP weight 1.1 / SLG weight 1.0: near-equal because league OBP (.594) ≈ SLG (.574)
+  // SB capped at 2× league average contribution to prevent volume outliers dominating
+  const RUN_WIN=2.5;
   const replOBP=lgAvg.OBP*0.87, replSLG=lgAvg.SLG*0.87;
-  // Weights adjusted for high-scoring Division 5 environment:
-  // OBP: 1.4 (down from MLB 1.8) — getting on base less marginal when everyone reaches
-  // SLG: 1.0 (up from MLB 0.7) — extra bases matter more when bases are already clogged
-  const replRuns=((replOBP-lgAvg.OBP)*1.4+(replSLG-lgAvg.SLG)*1.0);
+  const replRuns=((replOBP-lgAvg.OBP)*1.1+(replSLG-lgAvg.SLG)*1.0);
   const lgAB = lgAvg.AB || 60;
+  const lgSB = lgAvg.SB || 10.5;
+  const SB_CAP = lgSB * 2 * 0.15; // max baserunning contribution = 2× league avg SB value
   BAT.forEach(p=>{
     const obp=flt(p.OBP),slg=flt(p.SLG),ab=flt(p.AB),sb=flt(p.SB),cs=flt(p.CS);
     if(ab<10){p.WAR=null;return;}
     const scale=ab/lgAB;
-    const wRAA=((obp-lgAvg.OBP)*1.4+(slg-lgAvg.SLG)*1.0)*scale;
-    // SB: 0.15 runs (down from 0.2) — stolen bases worth less in a high-scoring environment
-    // CS: -0.45 runs penalty — outs more costly when everyone else reaches base
-    const bsR=(sb*0.15)-(cs*0.45);
+    const wRAA=((obp-lgAvg.OBP)*1.1+(slg-lgAvg.SLG)*1.0)*scale;
+    const rawBsR=(sb*0.15)-(cs*0.45);
+    const bsR=Math.min(rawBsR, SB_CAP); // cap upside; penalty still applies uncapped
     const repl=replRuns*scale;
     p.WAR=Math.round((wRAA+bsR-repl)/RUN_WIN*10)/10;
   });
