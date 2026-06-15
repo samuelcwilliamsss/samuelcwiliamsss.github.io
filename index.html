@@ -367,7 +367,7 @@ tr:hover td{background:#fafaf8}
           <th onclick="sby('R')">R</th><th onclick="sby('H')">H</th>
           <th onclick="sby('2B')">2B</th><th onclick="sby('3B')">3B</th>
           <th onclick="sby('HR')">HR</th><th onclick="sby('RBI')">RBI</th>
-          <th onclick="sby('SB')">SB</th><th onclick="sby('BB')">BB</th>
+          <th onclick="sby('SB')">SB</th><th onclick="sby('CS')">CS</th><th onclick="sby('SBpct')">SB%</th><th onclick="sby('BB')">BB</th>
           <th onclick="sby('SO')">SO</th>
           <th onclick="sby('BBpct')">BB%</th>
           <th onclick="sby('Kpct')">K%</th>
@@ -1253,6 +1253,8 @@ function init() {
     const pa=flt(p.AB)+flt(p.BB)+flt(p.HBP);
     p.BBpct=pa>0?(flt(p.BB)/pa)*100:0;
     p.Kpct =pa>0?(flt(p.SO)/pa)*100:0;
+    const attempts=flt(p.SB)+flt(p.CS);
+    p.SBpct=attempts>0?(flt(p.SB)/attempts)*100:null;
   });
   const qual=BAT.filter(p=>flt(p.AB)>=10);
   const avg=f=>qual.reduce((s,p)=>s+flt(p[f]),0)/Math.max(qual.length,1);
@@ -1318,7 +1320,7 @@ function show(id) {
 }
 
 // ── Batting ──
-const BAT_DEFAULT_DIR={SO:1,Kpct:1,WAR:-1};
+const BAT_DEFAULT_DIR={SO:1,Kpct:1,CS:1,WAR:-1};
 function sby(f){
   if(bSort===f) bDir*=-1; else{bSort=f;bDir=BAT_DEFAULT_DIR[f]||(-1);}
   bPg=0;
@@ -1345,7 +1347,7 @@ function rBat(){
     <td><span class="tm-badge">${p.Team}</span></td>
     <td>${p.G}</td><td>${p.AB}</td><td>${p.R}</td><td>${p.H}</td>
     <td>${p['2B']}</td><td>${p['3B']}</td><td>${p.HR}</td><td>${p.RBI}</td>
-    <td>${p.SB}</td><td>${p.BB}</td><td>${p.SO}</td>
+    <td>${p.SB}</td><td>${p.CS||0}</td><td style="color:${flt(p.SBpct)>=75?'var(--green)':flt(p.SBpct)>0&&flt(p.SBpct)<75?'var(--red)':'var(--text3)'}">${p.SBpct!=null&&(flt(p.SB)+flt(p.CS))>0?flt(p.SBpct).toFixed(0)+'%':'—'}</td><td>${p.BB}</td><td>${p.SO}</td>
     <td>${fpct(p.BBpct)}</td><td>${fpct(p.Kpct)}</td>
     <td class="hl">${f3(p.AVG)}</td><td>${f3(p.OBP)}</td><td>${f3(p.SLG)}</td><td>${f3(p.OPS)}</td>
     <td style="font-weight:700;color:${p.WAR===null?'var(--text3)':flt(p.WAR)>=2?'#008044':flt(p.WAR)>=1?'#0057ff':flt(p.WAR)>=0?'var(--text2)':'#cc2200'}">${p.WAR===null?'—':((p.WAR>0?'+':'')+p.WAR)}</td>
@@ -2198,7 +2200,7 @@ function openBatCard(p){
       <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Counting stats</div>
       <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:6px">
         ${[['H',p.H,'H'],['2B',p['2B'],'2B'],['3B',p['3B'],'3B'],['HR',p.HR,'HR'],['RBI',p.RBI,'RBI'],
-           ['R',p.R,'R'],['SB',p.SB,'SB'],['BB',p.BB,'BB'],['SO',p.SO,'SO'],['G',p.G,null]
+           ['R',p.R,'R'],['SB',p.SB,'SB'],['CS',p.CS||0,null],['BB',p.BB,'BB'],['SO',p.SO,'SO'],['G',p.G,null]
           ].map(([l,v,f])=>{
             const pct=f?bpct(f,f==='SO'):null;
             const col=pct===null?'var(--text2)':pct>=75?'#008044':pct<=25?'#cc2200':'var(--text2)';
