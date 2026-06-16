@@ -376,6 +376,7 @@ tr:hover td{background:#fafaf8}
           <th onclick="sby('SLG')">SLG</th>
           <th onclick="sby('OPS')">OPS</th>
           <th onclick="sby('WAR')">WAR</th>
+          <th onclick="sby('WARp4')" title="WAR per 4 plate appearances — adjusts for sample size (4 PA ≈ one game in this format)">WAR/PA</th>
           <th></th>
         </tr></thead>
         <tbody id="bbody"></tbody>
@@ -677,7 +678,27 @@ const TEAM_ABBR = {
   // Extra aliases seen in BBF data
   'LMC':'London Mercenaries', 'LMA':'London Mastodons',   'LMY':'London Mayhem',
 };
-const abbrToName = abbr => TEAM_ABBR[abbr] || abbr;
+// ── Static WAR baselines (set at 2026 season halfway point — 202 qualified batters)
+// Fixing these prevents goalposts shifting as the season progresses.
+// Update at season end if you want to recalibrate for next year.
+const WAR_LG = {
+  OBP:   0.594,
+  SLG:   0.574,
+  OPS:   1.169,
+  AVG:   0.457,
+  AB:    15.8,
+  SB:    10.5,
+  BBpct: 22.2,
+  Kpct:  13.7,
+};
+const WAR_PIT_LG = {
+  ERA:   27.53,
+};
+const WAR_REPL_OBP = WAR_LG.OBP * 0.87;
+const WAR_REPL_SLG = WAR_LG.SLG * 0.87;
+const WAR_REPL_ERA = WAR_PIT_LG.ERA + 2.0;
+const WAR_RUN_WIN  = 2.5;  // scaled for 24-game season (MLB uses 9.5 over 162)
+const WAR_PIT_RUN_WIN = 12; // pitching scaled separately — shorter outings, higher ERA variance
 
 const TC = ['#0057ff','#e85d00','#008044','#7c3aed'];
 let BAT=[], PIT=[], TBAT=[], ROSTERS=[], FIXTURES=[], STANDINGS_DATA=[], STANDINGS={};
@@ -747,38 +768,36 @@ function parseCSV(text) {
 // Batting WAR: wRAA (runs above avg from OBP+SLG) + BsR (SB) - positional adj
 // Pitching WAR: ERA-based runs saved vs replacement level
 function calcWAR() {
-  // Positional adjustment removed — positions recorded as UTL in this division
-  const REPL_OBP = lgAvg.OBP ? lgAvg.OBP * 0.87 : 0.28;
-  const REPL_SLG = lgAvg.SLG ? lgAvg.SLG * 0.87 : 0.37;
-  const RUNS_PER_WIN = 2.5;
-
-  // Build position lookup from rosters
-  // posMap now built in init()
+  const RUNS_PER_WIN = WAR_RUN_WIN;
 
   const batWAR = BAT.filter(p => flt(p.AB) >= 10).map(p => {
     const obp = flt(p.OBP), slg = flt(p.SLG), ab = flt(p.AB), sb = flt(p.SB), cs = flt(p.CS);
-    const wRAA = ((obp - lgAvg.OBP) * 1.1 + (slg - lgAvg.SLG) * 1.0) * ab / 600;
-    const lgSB = lgAvg.SB || 10.5;
-    const SB_CAP = lgSB * 2 * 0.15;
-    const rawBsR = (sb * 0.15) - (cs * 0.45);
-    const bsR = Math.min(rawBsR, SB_CAP);
+    const wRAA = ((obp - WAR_LG.OBP) * 1.1 + (slg - WAR_LG.SLG) * 1.0) * ab / 600;
+    const bsR = (sb * 0.08) - (cs * 0.45);
     const posAdj = 0;
-    const replRuns = ((REPL_OBP - lgAvg.OBP) * 1.1 + (REPL_SLG - lgAvg.SLG) * 1.0) * ab / 600;
+    const replRuns = ((WAR_REPL_OBP - WAR_LG.OBP) * 1.1 + (WAR_REPL_SLG - WAR_LG.SLG) * 1.0) * ab / 600;
     const war = wRAA + bsR + posAdj - replRuns;
     return { name: p.Name, team: p.Team, war: Math.round(war * 10) / 10, type: 'bat', pos };
   }).sort((a,b) => b.war - a.war);
 
-  // Pitching WAR: unchanged — replacement level lgERA+2, capped per inning
-  const replERA = lgPitAvg.ERA ? lgPitAvg.ERA + 2.0 : 8.0;
   const pitWAR = PIT.filter(p => flt(p.IP) >= 5).map(p => {
     const era = flt(p.ERA), ip = flt(p.IP);
-    const runsAboveRepl = (replERA - era) / 9 * ip;
-    const maxWAR = ip / 4 * 0.5;
+    const runsAboveRepl = (WAR_REPL_ERA - era) / 9 * ip;
+    const maxWAR = ip / 5 * 0.5; // tightened: full outing = 4-5 innings in this format
     const war = Math.round(Math.min(runsAboveRepl / RUNS_PER_WIN, maxWAR) * 10) / 10;
     return { name: p.Name, team: p.Team, war, type: 'pit', ip };
   }).sort((a,b) => b.war - a.war);
 
-  return { batWAR, pitWAR };
+  // Pitching WAR: replacement level = static lgERA+2, capped per inning
+  const pitWARCalc = PIT.filter(p => flt(p.IP) >= 5).map(p => {
+    const era = flt(p.ERA), ip = flt(p.IP);
+    const runsAboveRepl = (WAR_REPL_ERA - era) / 9 * ip;
+    const maxWAR = ip / 5 * 0.5; // tightened: full outing = 4-5 innings in this format
+    const war = Math.round(Math.min(runsAboveRepl / RUNS_PER_WIN, maxWAR) * 10) / 10;
+    return { name: p.Name, team: p.Team, war, type: 'pit', ip };
+  }).sort((a,b) => b.war - a.war);
+
+  return { batWAR, pitWAR: pitWARCalc };
 }
 
 function rSimSearch() {
@@ -881,7 +900,7 @@ function rWAR() {
   $('war-content').innerHTML = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">'
     + renderList(top10bat, 'Batting WAR')
     + renderList(top10pit, 'Pitching WAR')
-    + '</div><div style="font-size:10px;color:var(--text3);margin-top:8px;border-top:1px solid var(--border2);padding-top:6px">Estimated WAR · Batting: wRAA (OBP×1.1 + SLG×1.0) + BsR (SB×0.15 − CS×0.45, capped at 2× lg avg) vs replacement · Scaled for 24-game season · Pitching: ERA vs lgERA+2, capped per inning</div>';
+    + '</div><div style="font-size:10px;color:var(--text3);margin-top:8px;border-top:1px solid var(--border2);padding-top:6px">Estimated WAR · Batting: wRAA (OBP×1.1 + SLG×1.0) + BsR (SB×0.10 − CS×0.45) vs static mid-season baseline · Scaled for 24-game season · Pitching: ERA vs lgERA+2, capped per inning</div>';
 }
 
 // ── Team scatter (Offence vs Defence) ──
@@ -1263,35 +1282,30 @@ function init() {
   lgPitAvg={ERA:pavg('ERA'),WHIP:pavg('WHIP'),BAVG:pavg('BAVG'),SO:pavg('SO'),
     IP:pavg('IP'),W:pavg('W'),BB:pavg('BB'),ER:pavg('ER'),H:pavg('H'),SV:pavg('SV'),_n:PIT.length};
   // ── Calculate WAR for all players ──
-  // RUN_WIN=2.5: scaled down from MLB 9.5 to give meaningful values over a 24-game season
-  // OBP weight 1.1 / SLG weight 1.0: near-equal because league OBP (.594) ≈ SLG (.574)
-  // SB capped at 2× league average contribution to prevent volume outliers dominating
-  const RUN_WIN=2.5;
-  const replOBP=lgAvg.OBP*0.87, replSLG=lgAvg.SLG*0.87;
-  const replRuns=((replOBP-lgAvg.OBP)*1.1+(replSLG-lgAvg.SLG)*1.0);
-  const lgAB = lgAvg.AB || 60;
-  const lgSB = lgAvg.SB || 10.5;
-  const SB_CAP = lgSB * 2 * 0.15; // max baserunning contribution = 2× league avg SB value
+  // Uses static mid-season baselines (WAR_LG) so goalposts don't shift as season progresses.
+  // OBP weight 1.1 / SLG weight 1.0: near-equal reflecting this division's OBP≈SLG environment.
+  // SB: 0.10 runs each (fun preserved, just slightly reduced vs MLB 0.2 given easy scoring)
+  // CS: −0.45 runs (outs costly when everyone else reaches)
+  // No SB cap — removed to keep stolen base value fun and visible
+  const replRunsWAR=((WAR_REPL_OBP-WAR_LG.OBP)*1.1+(WAR_REPL_SLG-WAR_LG.SLG)*1.0);
   BAT.forEach(p=>{
     const obp=flt(p.OBP),slg=flt(p.SLG),ab=flt(p.AB),sb=flt(p.SB),cs=flt(p.CS);
     if(ab<10){p.WAR=null;return;}
-    const scale=ab/lgAB;
-    const wRAA=((obp-lgAvg.OBP)*1.1+(slg-lgAvg.SLG)*1.0)*scale;
-    const rawBsR=(sb*0.15)-(cs*0.45);
-    const bsR=Math.min(rawBsR, SB_CAP); // cap upside; penalty still applies uncapped
-    const repl=replRuns*scale;
-    p.WAR=Math.round((wRAA+bsR-repl)/RUN_WIN*10)/10;
+    const scale=ab/WAR_LG.AB;
+    const wRAA=((obp-WAR_LG.OBP)*1.1+(slg-WAR_LG.SLG)*1.0)*scale;
+    const bsR=(sb*0.08)-(cs*0.45);
+    const repl=replRunsWAR*scale;
+    p.WAR=Math.round((wRAA+bsR-repl)/WAR_RUN_WIN*10)/10;
+    // WAR per 4 PA — normalises for sample size (4 PA ≈ one game for avg batter in 4-6 inning format)
+    const pa = flt(p.AB)+flt(p.BB)+flt(p.HBP);
+    p.WARp4 = pa>=10 ? Math.round((p.WAR / pa * 4)*100)/100 : null;
   });
-  // Replacement level = league ERA + 2 runs (fixed gap, not percentage)
-  // Higher RUN_WIN divisor (12) accounts for shorter/higher-scoring division
-  const replERA=lgPitAvg.ERA ? lgPitAvg.ERA+2.0 : 8.0;
-  const PIT_RUN_WIN=12;
+  const PIT_RUN_WIN=WAR_PIT_RUN_WIN;
   PIT.forEach(p=>{
     const era=flt(p.ERA),ip=flt(p.IP);
     if(ip<10){p.WAR=null;return;}
-    const runsAboveRepl=(replERA-era)/9*ip;
-    // Cap at 0.5 WAR per 4 innings to prevent outliers in short seasons
-    const maxWAR=ip/4*0.5;
+    const runsAboveRepl=(WAR_REPL_ERA-era)/9*ip;
+    const maxWAR=ip/5*0.5; // tightened: full outing = 4-5 innings in this format
     p.WAR=Math.round(Math.min(runsAboveRepl/PIT_RUN_WIN, maxWAR)*10)/10;
   });
 
@@ -1319,7 +1333,7 @@ function show(id) {
 }
 
 // ── Batting ──
-const BAT_DEFAULT_DIR={SO:1,Kpct:1,CS:1,WAR:-1};
+const BAT_DEFAULT_DIR={SO:1,Kpct:1,CS:1,WAR:-1,WARp4:-1};
 function sby(f){
   if(bSort===f) bDir*=-1; else{bSort=f;bDir=BAT_DEFAULT_DIR[f]||(-1);}
   bPg=0;
@@ -1350,6 +1364,7 @@ function rBat(){
     <td>${fpct(p.BBpct)}</td><td>${fpct(p.Kpct)}</td>
     <td class="hl">${f3(p.AVG)}</td><td>${f3(p.OBP)}</td><td>${f3(p.SLG)}</td><td>${f3(p.OPS)}</td>
     <td style="font-weight:700;color:${p.WAR===null?'var(--text3)':flt(p.WAR)>=2?'#008044':flt(p.WAR)>=1?'#0057ff':flt(p.WAR)>=0?'var(--text2)':'#cc2200'}">${p.WAR===null?'—':((p.WAR>0?'+':'')+p.WAR)}</td>
+    <td style="color:${p.WARp4===null?'var(--text3)':flt(p.WARp4)>=0.2?'#008044':flt(p.WARp4)>=0.1?'#0057ff':flt(p.WARp4)>=0?'var(--text2)':'#cc2200'};font-size:11px">${p.WARp4===null?'—':((p.WARp4>0?'+':'')+p.WARp4)}</td>
     <td><button class="addbtn" onclick='addCmp(${JSON.stringify({Name:p.Name,Team:p.Team,AVG:p.AVG,OBP:p.OBP,SLG:p.SLG,OPS:p.OPS,H:p.H,HR:p.HR,RBI:p.RBI,R:p.R,SB:p.SB,BB:p.BB,SO:p.SO,AB:p.AB,BBpct:p.BBpct,Kpct:p.Kpct})});show("cmp")'>+ Compare</button></td>
   </tr>`).join('');
 }
