@@ -744,10 +744,18 @@ const WAR_REPL_OBP = WAR_LG.OBP * 0.87;
 const WAR_REPL_SLG = WAR_LG.SLG * 0.87;
 const WAR_REPL_ERA = WAR_PIT_LG.ERA + 2.0;
 const WAR_RUN_WIN  = 2.5;  // scaled for 24-game season (MLB uses 9.5 over 162)
-const WAR_PIT_RUN_WIN = 12; // pitching scaled separately — shorter outings, higher ERA variance
+const WAR_PIT_RUN_WIN = 12; // kept for reference — pWAR now uses ERA+ formula
 const WAR_LG_ERR_RATE = 0.1347; // frozen at 2026 season halfway (1 error per 7.4 chances)
 const WAR_ERR_RUN    = 0.5;   // runs per error above average (conservative for high-walk env)
 const WAR_FIELD_MIN_TC = 15;  // minimum TC to qualify for dWAR
+// pWAR ERA+ constants (frozen at 2026 season halfway)
+const WAR_PIT_LG_ERA   = 27.53; // league average ERA
+const WAR_PIT_REPL_ERA = 29.53; // replacement level ERA (lgERA + 2)
+const WAR_PIT_REPL_ERAPLUS = 27.53 / 29.53; // ~0.932
+const WAR_PIT_ERAPLUS_CAP  = 4.0;  // cap ERA+ at 4× league — prevents extreme low-ERA outliers
+const WAR_PIT_AVG_IP   = 18;   // approximate average IP for qualified pitchers
+const WAR_PIT_SCALE    = 1.2;  // tuning factor
+const WAR_PIT_MIN_IP   = 8;    // minimum IP to qualify for pWAR (covers relievers)
 
 const TC = ['#0057ff','#e85d00','#008044','#7c3aed'];
 let BAT=[], PIT=[], FIELD=[], TBAT=[], ROSTERS=[], FIXTURES=[], STANDINGS_DATA=[], STANDINGS={};
@@ -930,7 +938,7 @@ function rWAR() {
   $('war-content').innerHTML = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">'
     + renderList(top10bat, 'Batting WAR')
     + renderList(top10pit, 'Pitching WAR')
-    + '</div><div style="font-size:10px;color:var(--text3);margin-top:8px;border-top:1px solid var(--border2);padding-top:6px">bWAR: wRAA (OBP×1.1 + SLG×1.0) + BsR (SB×0.08 − CS×0.45) vs static mid-season baseline · pWAR: ERA vs lgERA+2 (WAR_PIT_RUN_WIN=12), IP≥5 · dWAR: errors vs expected (TC≥15, frozen lgErrRate=0.1347) · See Total WAR leaderboard for combined rankings</div>';
+    + '</div><div style="font-size:10px;color:var(--text3);margin-top:8px;border-top:1px solid var(--border2);padding-top:6px">bWAR: wRAA (OBP×1.1 + SLG×1.0) + BsR (SB×0.08 − CS×0.45) vs frozen mid-season baseline · pWAR: ERA+ style (quality primary, IP secondary), IP≥8, ERA+ capped at 4× lgERA · dWAR: errors vs expected at frozen lgErrRate=0.1347, TC≥15 · See Total WAR tab for combined rankings</div>';
 }
 
 // ── Team scatter (Offence vs Defence) ──
@@ -1361,15 +1369,16 @@ function init() {
     p.tWAR = null; // set after PIT loop
   });
 
-  // ── Pitching WAR (pWAR) — fixed to use WAR_PIT_RUN_WIN, threshold IP>=5 ──
+  // ── Pitching WAR (pWAR) — ERA+ style, quality primary, IP secondary ──
+  // eraPlus = min(lgERA / ERA, cap)  — how many times better than league average
+  // pWAR = (eraPlus − replERAplus) × (IP / avgIP) × scale
   const pitWarMap = {};
   PIT.forEach(p=>{
-    const era=flt(p.ERA),ip=flt(p.IP);
-    if(ip<5){p.WAR=null;p.pWAR=null;return;}
-    const runsAboveRepl=(WAR_REPL_ERA-era)/9*ip;
-    const maxWAR=ip/5*0.5;
-    p.pWAR=Math.round(Math.min(runsAboveRepl/WAR_PIT_RUN_WIN, maxWAR)*10)/10;
-    p.WAR=p.pWAR;
+    const era=flt(p.ERA), ip=flt(p.IP);
+    if(ip < WAR_PIT_MIN_IP){ p.WAR=null; p.pWAR=null; return; }
+    const eraPlus = Math.min(WAR_PIT_LG_ERA / Math.max(era, 0.1), WAR_PIT_ERAPLUS_CAP);
+    p.pWAR = Math.round((eraPlus - WAR_PIT_REPL_ERAPLUS) * (ip / WAR_PIT_AVG_IP) * WAR_PIT_SCALE * 10) / 10;
+    p.WAR  = p.pWAR;
     pitWarMap[p.Name] = (pitWarMap[p.Name]||0) + p.pWAR;
   });
 
@@ -1870,54 +1879,75 @@ function rLeaderboard(){
   $('lb-pit-content').innerHTML=`<div class="lb-grid">${PIT_CATS.map(c=>makePitCard(c)).join('')}</div>`;
 }
 
+// ── Total WAR sortable table ──
+let twarSort='tWAR', twarDir=-1;
+function twarSby(col){
+  if(twarSort===col) twarDir*=-1; else { twarSort=col; twarDir=-1; }
+  rTWARLeaderboard();
+}
 function rTWARLeaderboard(){
   if(!BAT.length) return;
-  const warCol=w=>w>=2?'#008044':w>=1?'#0057ff':w>=0?'var(--text2)':'#cc2200';
+  const warCol=w=>w===null||w===undefined?'var(--text3)':w>=2?'#008044':w>=1?'#0057ff':w>=0.1?'var(--text2)':w>=-0.1?'var(--text3)':'#cc2200';
   const fmtW=w=>w===null||w===undefined?'—':((w>0?'+':'')+w);
+  const fmtWcol=(w,bold)=>`<span style="font-weight:${bold?800:500};color:${warCol(w)}">${fmtW(w)}</span>`;
 
-  // Build combined list: all batters with tWAR, plus pure pitchers (in PIT but not BAT)
+  // Build combined list
   const batNames = new Set(BAT.map(p=>p.Name));
   const rows = [];
 
   BAT.filter(p=>p.tWAR!==null&&p.tWAR!==undefined).forEach(p=>{
     rows.push({
       name:p.Name, team:p.Team,
-      bWAR:p.bWAR, pWAR:p.pWAR||null, dWAR:p.dWAR||null, tWAR:p.tWAR
+      bWAR:p.bWAR!==null?p.bWAR:null,
+      pWAR:p.pWAR!==null?p.pWAR:null,
+      dWAR:p.dWAR!==null?p.dWAR:null,
+      tWAR:p.tWAR
     });
   });
-  // Pure pitchers (appear in PIT but not in BAT qualified list)
+  // Pure pitchers not in BAT
   PIT.filter(p=>p.pWAR!==null&&p.pWAR!==undefined&&!batNames.has(p.Name)).forEach(p=>{
     rows.push({ name:p.Name, team:p.Team, bWAR:null, pWAR:p.pWAR, dWAR:null, tWAR:p.pWAR });
   });
 
-  rows.sort((a,b)=>b.tWAR-a.tWAR);
+  // Sort
+  rows.sort((a,b)=>{
+    const av = a[twarSort]===null||a[twarSort]===undefined ? -99 : a[twarSort];
+    const bv = b[twarSort]===null||b[twarSort]===undefined ? -99 : b[twarSort];
+    return (bv-av)*twarDir;
+  });
 
-  const rankCls=i=>i===0?'gold':i===1?'silver':i===2?'bronze':'';
-  const rankIcon=i=>i===0?'🥇':i===1?'🥈':i===2?'🥉':(i+1);
+  const thStyle = col => `style="cursor:pointer;padding:7px 8px;font-size:10.5px;font-weight:700;color:${twarSort===col?'var(--accent)':'var(--text3)'};border-bottom:1px solid var(--border);white-space:nowrap;text-align:right"`;
+  const arrow = col => twarSort===col?(twarDir===-1?' ↓':' ↑'):'';
 
-  const breakdown=p=>{
-    const parts=[];
-    if(p.bWAR!==null) parts.push(`<span style="color:var(--accent)">b${fmtW(p.bWAR)}</span>`);
-    if(p.pWAR!==null) parts.push(`<span style="color:var(--accent2)">p${fmtW(p.pWAR)}</span>`);
-    if(p.dWAR!==null) parts.push(`<span style="color:${p.dWAR>=0?'var(--green)':'var(--red)'}">d${fmtW(p.dWAR)}</span>`);
-    return parts.join('<span style="color:var(--text3);margin:0 1px">+</span>');
-  };
-
-  const html = `<div style="max-width:480px">
+  const out = `<div>
     <div style="font-size:10px;color:var(--text3);margin-bottom:.75rem;padding:.5rem .75rem;background:#fafaf8;border:1px solid var(--border);border-radius:var(--radius-sm)">
-      <strong>tWAR</strong> = bWAR (batting) + pWAR (pitching) + dWAR (fielding, TC≥15). Players appear once combining all contributions.
+      <strong>tWAR</strong> = bWAR (batting) + pWAR (pitching, IP≥8, ERA+ formula) + dWAR (fielding, TC≥15). Click any column header to sort.
     </div>
-    ${rows.slice(0,25).map((p,i)=>`<div class="lb-row">
-      <span class="lb-rank ${rankCls(i)}">${rankIcon(i)}</span>
-      <div style="flex:1;min-width:0">
-        <div class="lb-name">${p.name}</div>
-        <div class="lb-team">${p.team} · <span style="font-size:10px">${breakdown(p)}</span></div>
-      </div>
-      <span class="lb-val top" style="color:${warCol(p.tWAR)}">${fmtW(p.tWAR)}</span>
-    </div>`).join('')}
+    <div class="tw"><table style="min-width:400px">
+      <thead><tr>
+        <th style="padding:7px 8px;font-size:10.5px;font-weight:700;color:var(--text3);border-bottom:1px solid var(--border);text-align:left">#</th>
+        <th style="padding:7px 8px;font-size:10.5px;font-weight:700;color:var(--text3);border-bottom:1px solid var(--border);text-align:left">Player</th>
+        <th style="padding:7px 8px;font-size:10.5px;font-weight:700;color:var(--text3);border-bottom:1px solid var(--border);text-align:left">Team</th>
+        <th ${thStyle('bWAR')} onclick="twarSby('bWAR')">bWAR${arrow('bWAR')}</th>
+        <th ${thStyle('pWAR')} onclick="twarSby('pWAR')">pWAR${arrow('pWAR')}</th>
+        <th ${thStyle('dWAR')} onclick="twarSby('dWAR')">dWAR${arrow('dWAR')}</th>
+        <th ${thStyle('tWAR')} onclick="twarSby('tWAR')">tWAR${arrow('tWAR')}</th>
+      </tr></thead>
+      <tbody>
+        ${rows.map((p,i)=>`<tr>
+          <td style="padding:5px 8px;color:#bbb;font-size:10px;border-bottom:1px solid var(--border2)">${i+1}</td>
+          <td style="padding:5px 8px;font-weight:600;font-size:12.5px;border-bottom:1px solid var(--border2);white-space:nowrap">${p.name}</td>
+          <td style="padding:5px 8px;border-bottom:1px solid var(--border2)"><span class="tm-badge">${p.team}</span></td>
+          <td style="padding:5px 8px;text-align:right;border-bottom:1px solid var(--border2)">${fmtWcol(p.bWAR,false)}</td>
+          <td style="padding:5px 8px;text-align:right;border-bottom:1px solid var(--border2)">${fmtWcol(p.pWAR,false)}</td>
+          <td style="padding:5px 8px;text-align:right;border-bottom:1px solid var(--border2)">${fmtWcol(p.dWAR,false)}</td>
+          <td style="padding:5px 8px;text-align:right;font-weight:800;font-size:13px;border-bottom:1px solid var(--border2)">${fmtWcol(p.tWAR,true)}</td>
+        </tr>`).join('')}
+      </tbody>
+    </table></div>
   </div>`;
 
-  $('lb-twar-content').innerHTML=html;
+  $('lb-twar-content').innerHTML=out;
 }
 
 // ── Standings ──
