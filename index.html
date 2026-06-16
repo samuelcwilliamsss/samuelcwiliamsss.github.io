@@ -379,9 +379,7 @@ tr:hover td{background:#fafaf8}
           <th onclick="sby('OBP')">OBP</th>
           <th onclick="sby('SLG')">SLG</th>
           <th onclick="sby('OPS')">OPS</th>
-          <th onclick="sby('bWAR')">bWAR</th>
-          <th onclick="sby('dWAR')" title="Defensive WAR — errors above/below expected (TC≥10 to qualify)">dWAR</th>
-          <th onclick="sby('tWAR')" title="Total WAR = bWAR + pWAR + dWAR">tWAR</th>
+          <th onclick="sby('bWAR')" title="Batting WAR — see Total WAR leaderboard for full picture">bWAR</th>
           <th onclick="sby('WARp4')" title="WAR per 4 plate appearances — adjusts for sample size (4 PA ≈ one game in this format)">WAR/PA</th>
           <th></th>
         </tr></thead>
@@ -1554,7 +1552,7 @@ function show(id) {
 }
 
 // ── Batting ──
-const BAT_DEFAULT_DIR={SO:1,Kpct:1,CS:1,bWAR:-1,dWAR:-1,tWAR:-1,WARp4:-1};
+const BAT_DEFAULT_DIR={SO:1,Kpct:1,CS:1,bWAR:-1,WARp4:-1};
 function sby(f){
   if(bSort===f) bDir*=-1; else{bSort=f;bDir=BAT_DEFAULT_DIR[f]||(-1);}
   bPg=0;
@@ -1585,8 +1583,6 @@ function rBat(){
     <td>${fpct(p.BBpct)}</td><td>${fpct(p.Kpct)}</td>
     <td class="hl">${f3(p.AVG)}</td><td>${f3(p.OBP)}</td><td>${f3(p.SLG)}</td><td>${f3(p.OPS)}</td>
     <td style="font-weight:700;color:${p.bWAR===null?'var(--text3)':flt(p.bWAR)>=2?'#008044':flt(p.bWAR)>=1?'#0057ff':flt(p.bWAR)>=0?'var(--text2)':'#cc2200'}">${p.bWAR===null?'—':((p.bWAR>0?'+':'')+p.bWAR)}</td>
-    <td style="font-size:11px;color:${p.dWAR===null?'var(--text3)':flt(p.dWAR)>0?'#008044':flt(p.dWAR)<0?'#cc2200':'var(--text3)'}">${p.dWAR===null?'—':((p.dWAR>0?'+':'')+p.dWAR)}</td>
-    <td style="font-weight:800;color:${p.tWAR===null?'var(--text3)':flt(p.tWAR)>=2?'#008044':flt(p.tWAR)>=1?'#0057ff':flt(p.tWAR)>=0?'var(--text2)':'#cc2200'}">${p.tWAR===null?'—':((p.tWAR>0?'+':'')+p.tWAR)}</td>
     <td><button class="addbtn" onclick='addCmp(${JSON.stringify({Name:p.Name,Team:p.Team,AVG:p.AVG,OBP:p.OBP,SLG:p.SLG,OPS:p.OPS,H:p.H,HR:p.HR,RBI:p.RBI,R:p.R,SB:p.SB,BB:p.BB,SO:p.SO,AB:p.AB,BBpct:p.BBpct,Kpct:p.Kpct})});show("cmp")'>+ Compare</button></td>
   </tr>`).join('');
 }
