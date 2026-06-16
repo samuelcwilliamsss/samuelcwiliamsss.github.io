@@ -377,7 +377,9 @@ tr:hover td{background:#fafaf8}
           <th onclick="sby('OBP')">OBP</th>
           <th onclick="sby('SLG')">SLG</th>
           <th onclick="sby('OPS')">OPS</th>
-          <th onclick="sby('WAR')">WAR</th>
+          <th onclick="sby('bWAR')">bWAR</th>
+          <th onclick="sby('dWAR')" title="Defensive WAR — errors above/below expected (TC≥15 to qualify)">dWAR</th>
+          <th onclick="sby('tWAR')" title="Total WAR = bWAR + pWAR + dWAR">tWAR</th>
           <th onclick="sby('WARp4')" title="WAR per 4 plate appearances — adjusts for sample size (4 PA ≈ one game in this format)">WAR/PA</th>
           <th></th>
         </tr></thead>
@@ -449,6 +451,7 @@ tr:hover td{background:#fafaf8}
           <th onclick="fsby('CSB')" title="Caught Stealing (as fielder/catcher)">CS</th>
           <th onclick="fsby('SBAP')" title="SB% Against">SB%</th>
           <th onclick="fsby('PB')" title="Passed Balls">PB</th>
+          <th onclick="fsby('dWAR')" title="Defensive WAR (TC≥15 to qualify)" class="s">dWAR</th>
         </tr></thead>
         <tbody id="fbody"></tbody>
       </table></div>
@@ -462,9 +465,11 @@ tr:hover td{background:#fafaf8}
     <div class="lb-tabs" id="lb-tabs">
       <button class="lb-tab active" onclick="setLbMode('bat')">Batting</button>
       <button class="lb-tab" onclick="setLbMode('pit')">Pitching</button>
+      <button class="lb-tab" onclick="setLbMode('twar')">Total WAR</button>
     </div>
     <div id="lb-bat-content"></div>
     <div id="lb-pit-content" style="display:none"></div>
+    <div id="lb-twar-content" style="display:none"></div>
   </div>
 
   <!-- STANDINGS -->
@@ -740,6 +745,9 @@ const WAR_REPL_SLG = WAR_LG.SLG * 0.87;
 const WAR_REPL_ERA = WAR_PIT_LG.ERA + 2.0;
 const WAR_RUN_WIN  = 2.5;  // scaled for 24-game season (MLB uses 9.5 over 162)
 const WAR_PIT_RUN_WIN = 12; // pitching scaled separately — shorter outings, higher ERA variance
+const WAR_LG_ERR_RATE = 0.1347; // frozen at 2026 season halfway (1 error per 7.4 chances)
+const WAR_ERR_RUN    = 0.5;   // runs per error above average (conservative for high-walk env)
+const WAR_FIELD_MIN_TC = 15;  // minimum TC to qualify for dWAR
 
 const TC = ['#0057ff','#e85d00','#008044','#7c3aed'];
 let BAT=[], PIT=[], FIELD=[], TBAT=[], ROSTERS=[], FIXTURES=[], STANDINGS_DATA=[], STANDINGS={};
@@ -810,36 +818,16 @@ function parseCSV(text) {
 // Batting WAR: wRAA (runs above avg from OBP+SLG) + BsR (SB) - positional adj
 // Pitching WAR: ERA-based runs saved vs replacement level
 function calcWAR() {
-  const RUNS_PER_WIN = WAR_RUN_WIN;
+  // Reads pre-computed bWAR/pWAR/dWAR/tWAR from BAT and PIT arrays (set in init())
+  const batWAR = BAT.filter(p => p.bWAR !== null && p.bWAR !== undefined)
+    .map(p => ({ name: p.Name, team: p.Team, war: p.bWAR, type: 'bat' }))
+    .sort((a,b) => b.war - a.war);
 
-  const batWAR = BAT.filter(p => flt(p.AB) >= 10).map(p => {
-    const obp = flt(p.OBP), slg = flt(p.SLG), ab = flt(p.AB), sb = flt(p.SB), cs = flt(p.CS);
-    const wRAA = ((obp - WAR_LG.OBP) * 1.1 + (slg - WAR_LG.SLG) * 1.0) * ab / 600;
-    const bsR = (sb * 0.08) - (cs * 0.45);
-    const posAdj = 0;
-    const replRuns = ((WAR_REPL_OBP - WAR_LG.OBP) * 1.1 + (WAR_REPL_SLG - WAR_LG.SLG) * 1.0) * ab / 600;
-    const war = wRAA + bsR + posAdj - replRuns;
-    return { name: p.Name, team: p.Team, war: Math.round(war * 10) / 10, type: 'bat', pos };
-  }).sort((a,b) => b.war - a.war);
+  const pitWAR = PIT.filter(p => p.pWAR !== null && p.pWAR !== undefined)
+    .map(p => ({ name: p.Name, team: p.Team, war: p.pWAR, type: 'pit', ip: flt(p.IP) }))
+    .sort((a,b) => b.war - a.war);
 
-  const pitWAR = PIT.filter(p => flt(p.IP) >= 5).map(p => {
-    const era = flt(p.ERA), ip = flt(p.IP);
-    const runsAboveRepl = (WAR_REPL_ERA - era) / 9 * ip;
-    const maxWAR = ip / 5 * 0.5; // tightened: full outing = 4-5 innings in this format
-    const war = Math.round(Math.min(runsAboveRepl / RUNS_PER_WIN, maxWAR) * 10) / 10;
-    return { name: p.Name, team: p.Team, war, type: 'pit', ip };
-  }).sort((a,b) => b.war - a.war);
-
-  // Pitching WAR: replacement level = static lgERA+2, capped per inning
-  const pitWARCalc = PIT.filter(p => flt(p.IP) >= 5).map(p => {
-    const era = flt(p.ERA), ip = flt(p.IP);
-    const runsAboveRepl = (WAR_REPL_ERA - era) / 9 * ip;
-    const maxWAR = ip / 5 * 0.5; // tightened: full outing = 4-5 innings in this format
-    const war = Math.round(Math.min(runsAboveRepl / RUNS_PER_WIN, maxWAR) * 10) / 10;
-    return { name: p.Name, team: p.Team, war, type: 'pit', ip };
-  }).sort((a,b) => b.war - a.war);
-
-  return { batWAR, pitWAR: pitWARCalc };
+  return { batWAR, pitWAR };
 }
 
 function rSimSearch() {
@@ -942,7 +930,7 @@ function rWAR() {
   $('war-content').innerHTML = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">'
     + renderList(top10bat, 'Batting WAR')
     + renderList(top10pit, 'Pitching WAR')
-    + '</div><div style="font-size:10px;color:var(--text3);margin-top:8px;border-top:1px solid var(--border2);padding-top:6px">Estimated WAR · Batting: wRAA (OBP×1.1 + SLG×1.0) + BsR (SB×0.10 − CS×0.45) vs static mid-season baseline · Scaled for 24-game season · Pitching: ERA vs lgERA+2, capped per inning</div>';
+    + '</div><div style="font-size:10px;color:var(--text3);margin-top:8px;border-top:1px solid var(--border2);padding-top:6px">bWAR: wRAA (OBP×1.1 + SLG×1.0) + BsR (SB×0.08 − CS×0.45) vs static mid-season baseline · pWAR: ERA vs lgERA+2 (WAR_PIT_RUN_WIN=12), IP≥5 · dWAR: errors vs expected (TC≥15, frozen lgErrRate=0.1347) · See Total WAR leaderboard for combined rankings</div>';
 }
 
 // ── Team scatter (Offence vs Defence) ──
@@ -1339,25 +1327,60 @@ function init() {
   // CS: −0.45 runs (outs costly when everyone else reaches)
   // No SB cap — removed to keep stolen base value fun and visible
   const replRunsWAR=((WAR_REPL_OBP-WAR_LG.OBP)*1.1+(WAR_REPL_SLG-WAR_LG.SLG)*1.0);
+
+  // ── Build dWAR lookup from FIELD data (TC >= WAR_FIELD_MIN_TC) ──
+  const dwarMap = {};
+  FIELD.forEach(p => {
+    const tc = flt(p.C), e = flt(p.E);
+    if(tc < WAR_FIELD_MIN_TC) return;
+    const expE = tc * WAR_LG_ERR_RATE;
+    const dwar = Math.round(-(e - expE) * WAR_ERR_RUN / WAR_RUN_WIN * 10) / 10;
+    // Keep best (highest) dWAR if player appears multiple times
+    if(dwarMap[p.Name] === undefined || dwar > dwarMap[p.Name]) dwarMap[p.Name] = dwar;
+  });
+
+  // ── Stamp dWAR onto FIELD records for display in fielding tab ──
+  FIELD.forEach(p=>{ p.dWAR = dwarMap[p.Name] !== undefined ? dwarMap[p.Name] : null; });
+
+  // ── Batting WAR (bWAR) ──
   BAT.forEach(p=>{
     const obp=flt(p.OBP),slg=flt(p.SLG),ab=flt(p.AB),sb=flt(p.SB),cs=flt(p.CS);
-    if(ab<10){p.WAR=null;return;}
+    if(ab<10){p.bWAR=null;p.WAR=null;return;}
     const scale=ab/WAR_LG.AB;
     const wRAA=((obp-WAR_LG.OBP)*1.1+(slg-WAR_LG.SLG)*1.0)*scale;
     const bsR=(sb*0.08)-(cs*0.45);
     const repl=replRunsWAR*scale;
-    p.WAR=Math.round((wRAA+bsR-repl)/WAR_RUN_WIN*10)/10;
-    // WAR per 4 PA — normalises for sample size (4 PA ≈ one game for avg batter in 4-6 inning format)
+    p.bWAR=Math.round((wRAA+bsR-repl)/WAR_RUN_WIN*10)/10;
+    p.WAR=p.bWAR; // keep p.WAR as alias for bWAR for backwards compat
+    // WAR per 4 PA — normalises for sample size
     const pa = flt(p.AB)+flt(p.BB)+flt(p.HBP);
-    p.WARp4 = pa>=10 ? Math.round((p.WAR / pa * 4)*100)/100 : null;
+    p.WARp4 = pa>=10 ? Math.round((p.bWAR / pa * 4)*100)/100 : null;
+    // dWAR from fielding
+    p.dWAR = dwarMap[p.Name] !== undefined ? dwarMap[p.Name] : null;
+    // tWAR = bWAR + pWAR (from pitching sheet) + dWAR — pWAR added after PIT loop below
+    p.tWAR = null; // set after PIT loop
   });
-  const PIT_RUN_WIN=WAR_PIT_RUN_WIN;
+
+  // ── Pitching WAR (pWAR) — fixed to use WAR_PIT_RUN_WIN, threshold IP>=5 ──
+  const pitWarMap = {};
   PIT.forEach(p=>{
     const era=flt(p.ERA),ip=flt(p.IP);
-    if(ip<10){p.WAR=null;return;}
+    if(ip<5){p.WAR=null;p.pWAR=null;return;}
     const runsAboveRepl=(WAR_REPL_ERA-era)/9*ip;
-    const maxWAR=ip/5*0.5; // tightened: full outing = 4-5 innings in this format
-    p.WAR=Math.round(Math.min(runsAboveRepl/PIT_RUN_WIN, maxWAR)*10)/10;
+    const maxWAR=ip/5*0.5;
+    p.pWAR=Math.round(Math.min(runsAboveRepl/WAR_PIT_RUN_WIN, maxWAR)*10)/10;
+    p.WAR=p.pWAR;
+    pitWarMap[p.Name] = (pitWarMap[p.Name]||0) + p.pWAR;
+  });
+
+  // ── tWAR = bWAR + pWAR + dWAR for each batter ──
+  BAT.forEach(p=>{
+    if(p.bWAR===null) return;
+    const bw = p.bWAR||0;
+    const pw = pitWarMap[p.Name]||0;
+    const dw = p.dWAR||0;
+    p.pWAR = pitWarMap[p.Name]!==undefined ? pitWarMap[p.Name] : null;
+    p.tWAR = Math.round((bw + pw + dw)*10)/10;
   });
 
   bPg=0;pPg=0;cPg=0;pcPg=0;fPg=0;
@@ -1386,7 +1409,7 @@ function show(id) {
 }
 
 // ── Batting ──
-const BAT_DEFAULT_DIR={SO:1,Kpct:1,CS:1,WAR:-1,WARp4:-1};
+const BAT_DEFAULT_DIR={SO:1,Kpct:1,CS:1,bWAR:-1,dWAR:-1,tWAR:-1,WARp4:-1};
 function sby(f){
   if(bSort===f) bDir*=-1; else{bSort=f;bDir=BAT_DEFAULT_DIR[f]||(-1);}
   bPg=0;
@@ -1416,8 +1439,9 @@ function rBat(){
     <td>${p.SB}</td><td>${p.CS||0}</td><td style="color:${flt(p.SBpct)>=75?'var(--green)':flt(p.SBpct)>0&&flt(p.SBpct)<75?'var(--red)':'var(--text3)'}">${p.SBpct!=null&&(flt(p.SB)+flt(p.CS))>0?flt(p.SBpct).toFixed(0)+'%':'—'}</td><td>${p.BB}</td><td>${p.SO}</td>
     <td>${fpct(p.BBpct)}</td><td>${fpct(p.Kpct)}</td>
     <td class="hl">${f3(p.AVG)}</td><td>${f3(p.OBP)}</td><td>${f3(p.SLG)}</td><td>${f3(p.OPS)}</td>
-    <td style="font-weight:700;color:${p.WAR===null?'var(--text3)':flt(p.WAR)>=2?'#008044':flt(p.WAR)>=1?'#0057ff':flt(p.WAR)>=0?'var(--text2)':'#cc2200'}">${p.WAR===null?'—':((p.WAR>0?'+':'')+p.WAR)}</td>
-    <td style="color:${p.WARp4===null?'var(--text3)':flt(p.WARp4)>=0.2?'#008044':flt(p.WARp4)>=0.1?'#0057ff':flt(p.WARp4)>=0?'var(--text2)':'#cc2200'};font-size:11px">${p.WARp4===null?'—':((p.WARp4>0?'+':'')+p.WARp4)}</td>
+    <td style="font-weight:700;color:${p.bWAR===null?'var(--text3)':flt(p.bWAR)>=2?'#008044':flt(p.bWAR)>=1?'#0057ff':flt(p.bWAR)>=0?'var(--text2)':'#cc2200'}">${p.bWAR===null?'—':((p.bWAR>0?'+':'')+p.bWAR)}</td>
+    <td style="font-size:11px;color:${p.dWAR===null?'var(--text3)':flt(p.dWAR)>0?'#008044':flt(p.dWAR)<0?'#cc2200':'var(--text3)'}">${p.dWAR===null?'—':((p.dWAR>0?'+':'')+p.dWAR)}</td>
+    <td style="font-weight:800;color:${p.tWAR===null?'var(--text3)':flt(p.tWAR)>=2?'#008044':flt(p.tWAR)>=1?'#0057ff':flt(p.tWAR)>=0?'var(--text2)':'#cc2200'}">${p.tWAR===null?'—':((p.tWAR>0?'+':'')+p.tWAR)}</td>
     <td><button class="addbtn" onclick='addCmp(${JSON.stringify({Name:p.Name,Team:p.Team,AVG:p.AVG,OBP:p.OBP,SLG:p.SLG,OPS:p.OPS,H:p.H,HR:p.HR,RBI:p.RBI,R:p.R,SB:p.SB,BB:p.BB,SO:p.SO,AB:p.AB,BBpct:p.BBpct,Kpct:p.Kpct})});show("cmp")'>+ Compare</button></td>
   </tr>`).join('');
 }
@@ -1486,6 +1510,7 @@ function rField(){
     <td>${p.SBA||'—'}</td><td>${p.CSB||'—'}</td>
     <td>${p.SBAP?flt(p.SBAP).toFixed(1)+'%':'—'}</td>
     <td style="color:${flt(p.PB)>0?'var(--red)':'var(--text3)'}">${p.PB||0}</td>
+    <td style="font-weight:700;color:${p.dWAR===undefined||p.dWAR===null?'var(--text3)':flt(p.dWAR)>0?'#008044':flt(p.dWAR)<0?'#cc2200':'var(--text3)'}">${p.dWAR===undefined||p.dWAR===null?'—':((p.dWAR>0?'+':'')+p.dWAR)}</td>
   </tr>`).join('');
 }
 
@@ -1770,9 +1795,12 @@ function rLAvgTeams(){
 // ── Leaderboard ──
 function setLbMode(m){
   lbMode=m;
-  document.querySelectorAll('.lb-tab').forEach(b=>b.classList.toggle('active',b.textContent===(m==='bat'?'Batting':'Pitching')));
+  const labels={'bat':'Batting','pit':'Pitching','twar':'Total WAR'};
+  document.querySelectorAll('.lb-tab').forEach(b=>b.classList.toggle('active',b.textContent===labels[m]));
   $('lb-bat-content').style.display=m==='bat'?'':'none';
   $('lb-pit-content').style.display=m==='pit'?'':'none';
+  $('lb-twar-content').style.display=m==='twar'?'':'none';
+  if(m==='twar') rTWARLeaderboard();
 }
 function rLeaderboard(){
   if(!BAT.length)return;
@@ -1840,6 +1868,56 @@ function rLeaderboard(){
   };
   $('lb-bat-content').innerHTML=`<div class="lb-grid">${BAT_CATS.map(c=>makeCard(c,qual)).join('')}</div>`;
   $('lb-pit-content').innerHTML=`<div class="lb-grid">${PIT_CATS.map(c=>makePitCard(c)).join('')}</div>`;
+}
+
+function rTWARLeaderboard(){
+  if(!BAT.length) return;
+  const warCol=w=>w>=2?'#008044':w>=1?'#0057ff':w>=0?'var(--text2)':'#cc2200';
+  const fmtW=w=>w===null||w===undefined?'—':((w>0?'+':'')+w);
+
+  // Build combined list: all batters with tWAR, plus pure pitchers (in PIT but not BAT)
+  const batNames = new Set(BAT.map(p=>p.Name));
+  const rows = [];
+
+  BAT.filter(p=>p.tWAR!==null&&p.tWAR!==undefined).forEach(p=>{
+    rows.push({
+      name:p.Name, team:p.Team,
+      bWAR:p.bWAR, pWAR:p.pWAR||null, dWAR:p.dWAR||null, tWAR:p.tWAR
+    });
+  });
+  // Pure pitchers (appear in PIT but not in BAT qualified list)
+  PIT.filter(p=>p.pWAR!==null&&p.pWAR!==undefined&&!batNames.has(p.Name)).forEach(p=>{
+    rows.push({ name:p.Name, team:p.Team, bWAR:null, pWAR:p.pWAR, dWAR:null, tWAR:p.pWAR });
+  });
+
+  rows.sort((a,b)=>b.tWAR-a.tWAR);
+
+  const rankCls=i=>i===0?'gold':i===1?'silver':i===2?'bronze':'';
+  const rankIcon=i=>i===0?'🥇':i===1?'🥈':i===2?'🥉':(i+1);
+
+  const breakdown=p=>{
+    const parts=[];
+    if(p.bWAR!==null) parts.push(`<span style="color:var(--accent)">b${fmtW(p.bWAR)}</span>`);
+    if(p.pWAR!==null) parts.push(`<span style="color:var(--accent2)">p${fmtW(p.pWAR)}</span>`);
+    if(p.dWAR!==null) parts.push(`<span style="color:${p.dWAR>=0?'var(--green)':'var(--red)'}">d${fmtW(p.dWAR)}</span>`);
+    return parts.join('<span style="color:var(--text3);margin:0 1px">+</span>');
+  };
+
+  const html = `<div style="max-width:480px">
+    <div style="font-size:10px;color:var(--text3);margin-bottom:.75rem;padding:.5rem .75rem;background:#fafaf8;border:1px solid var(--border);border-radius:var(--radius-sm)">
+      <strong>tWAR</strong> = bWAR (batting) + pWAR (pitching) + dWAR (fielding, TC≥15). Players appear once combining all contributions.
+    </div>
+    ${rows.slice(0,25).map((p,i)=>`<div class="lb-row">
+      <span class="lb-rank ${rankCls(i)}">${rankIcon(i)}</span>
+      <div style="flex:1;min-width:0">
+        <div class="lb-name">${p.name}</div>
+        <div class="lb-team">${p.team} · <span style="font-size:10px">${breakdown(p)}</span></div>
+      </div>
+      <span class="lb-val top" style="color:${warCol(p.tWAR)}">${fmtW(p.tWAR)}</span>
+    </div>`).join('')}
+  </div>`;
+
+  $('lb-twar-content').innerHTML=html;
 }
 
 // ── Standings ──
