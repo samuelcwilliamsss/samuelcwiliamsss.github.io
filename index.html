@@ -321,6 +321,7 @@ tr:hover td{background:#fafaf8}
     <button class="tab" onclick="show('home')" id="tab-home">Home</button>
     <button class="tab" onclick="show('bat')" id="tab-bat">Batting</button>
     <button class="tab" onclick="show('pit')" id="tab-pit">Pitching</button>
+    <button class="tab" onclick="show('field')" id="tab-field">Fielding</button>
     <button class="tab" onclick="show('leaders')" id="tab-leaders">Leaderboard</button>
     <button class="tab" onclick="show('standings')" id="tab-standings">Standings</button>
     <button class="tab" onclick="show('teams')" id="tab-teams">Teams</button>
@@ -340,6 +341,7 @@ tr:hover td{background:#fafaf8}
     <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:1rem;padding-bottom:1rem">
       <div class="home-card" onclick="show('bat')"><div class="home-card-title">Batting Stats</div><div class="home-card-sub" id="hc-bat">Loading…</div></div>
       <div class="home-card" onclick="show('pit')"><div class="home-card-title">Pitching Stats</div><div class="home-card-sub" id="hc-pit">Loading…</div></div>
+      <div class="home-card" onclick="show('field')"><div class="home-card-title">Fielding Stats</div><div class="home-card-sub" id="hc-field">Loading…</div></div>
       <div class="home-card" onclick="show('standings')"><div class="home-card-title">Standings</div><div class="home-card-sub">W · L · PCT · GB</div></div>
       <div class="home-card" onclick="show('leaders')"><div class="home-card-title">Leaderboards</div><div class="home-card-sub">Top 10 per stat</div></div>
       <div class="home-card" onclick="show('teams')"><div class="home-card-title">Teams</div><div class="home-card-sub">Rosters &amp; stats</div></div>
@@ -414,6 +416,44 @@ tr:hover td{background:#fafaf8}
       </table></div>
       <div class="pag"><button onclick="ppg(-1)">‹ Prev</button><span id="ppgi"></span><button onclick="ppg(1)">Next ›</button></div>
       <div class="last-updated" id="pit-updated"></div>
+    </div>
+  </div>
+
+  <!-- FIELDING -->
+  <div id="p-field" class="panel">
+    <div id="field-loader" class="loader"><div class="spin"></div><span>Loading fielding stats…</span></div>
+    <div id="field-content" style="display:none">
+      <div class="ctrl">
+        <input type="text" id="fsrch" placeholder="Search player…" oninput="rField()">
+        <select id="fteam" onchange="rField()"><option value="">All teams</option></select>
+        <select id="fsort" onchange="rField()">
+          <option value="FPCT">FPCT</option>
+          <option value="E">Errors (most)</option>
+          <option value="PO">PO</option>
+          <option value="A">Assists</option>
+          <option value="G">Games</option>
+        </select>
+        <span id="fcount" style="font-size:12px;color:var(--text3)"></span>
+      </div>
+      <div class="tw"><table>
+        <thead><tr>
+          <th style="width:26px">#</th><th>Player</th><th>Team</th>
+          <th onclick="fsby('G')">G</th>
+          <th onclick="fsby('C')">TC</th>
+          <th onclick="fsby('PO')">PO</th>
+          <th onclick="fsby('A')">A</th>
+          <th onclick="fsby('E')" title="Errors">E</th>
+          <th onclick="fsby('DP')">DP</th>
+          <th onclick="fsby('FPCT')" class="s">FPCT</th>
+          <th onclick="fsby('SBA')" title="Stolen Base Attempts Against">SBA</th>
+          <th onclick="fsby('CSB')" title="Caught Stealing (as fielder/catcher)">CS</th>
+          <th onclick="fsby('SBAP')" title="SB% Against">SB%</th>
+          <th onclick="fsby('PB')" title="Passed Balls">PB</th>
+        </tr></thead>
+        <tbody id="fbody"></tbody>
+      </table></div>
+      <div class="pag"><button onclick="fpg(-1)">‹ Prev</button><span id="fpgi"></span><button onclick="fpg(1)">Next ›</button></div>
+      <div class="last-updated" id="field-updated"></div>
     </div>
   </div>
 
@@ -625,6 +665,7 @@ tr:hover td{background:#fafaf8}
 const SHEET_BASE = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRfcExy7QI69mNIzKjEe4OLIktSVWYlD4ttC7UqnbWWfTYhQy4rWlsoRX7_ddl27-uiUj3Vo9CV9NpL/pub?output=csv&gid=';
 const GID_BAT     = '34236868';
 const GID_PIT     = '1358930240';
+const GID_FIELD   = '1735636855';
 const GID_TBAT    = '862775525';
 // These GIDs are created by the bookmarklet — will be '' until first run
 // Replace with actual GIDs after running the bookmarklet (check your sheet tab names)
@@ -701,10 +742,11 @@ const WAR_RUN_WIN  = 2.5;  // scaled for 24-game season (MLB uses 9.5 over 162)
 const WAR_PIT_RUN_WIN = 12; // pitching scaled separately — shorter outings, higher ERA variance
 
 const TC = ['#0057ff','#e85d00','#008044','#7c3aed'];
-let BAT=[], PIT=[], TBAT=[], ROSTERS=[], FIXTURES=[], STANDINGS_DATA=[], STANDINGS={};
+let BAT=[], PIT=[], FIELD=[], TBAT=[], ROSTERS=[], FIXTURES=[], STANDINGS_DATA=[], STANDINGS={};
 let selTeams=[], slA=null, slB=null, pslA=null, pslB=null;
 let bSort='AVG', bDir=-1, bPg=0, bFil=[];
 let pSort='ERA', pDir=1,  pPg=0, pFil=[];
+let fSort='FPCT', fDir=-1, fPg=0, fFil=[];
 let cPg=0, pcPg=0;
 let lgAvg={}, lgPitAvg={};
 let lbMode = 'bat';
@@ -1232,11 +1274,13 @@ async function loadAll() {
     const standingsPromise = GID_STANDINGS ? fetch(SHEET_BASE+GID_STANDINGS).then(r=>r.ok?r.text():'').catch(()=>'') : Promise.resolve('');
     const rosterPromise  = GID_ROSTERS  ? fetch(SHEET_BASE+GID_ROSTERS).then(r=>{console.log('Roster fetch status:',r.status);return r.ok?r.text():'';}).catch(e=>{console.log('Roster fetch error:',e.message);return '';})  : Promise.resolve('');
     const fixturePromise = GID_FIXTURES ? fetch(SHEET_BASE+GID_FIXTURES).then(r=>{console.log('Fixture fetch status:',r.status);return r.ok?r.text():'';}).catch(e=>{console.log('Fixture fetch error:',e.message);return '';}) : Promise.resolve('');
+    const fieldingPromise= GID_FIELD    ? fetch(SHEET_BASE+GID_FIELD).then(r=>r.ok?r.text():'').catch(()=>'') : Promise.resolve('');
 
-    const [br,pr,tbr,rr,fr,stdr] = await Promise.all([...corePromises, rosterPromise, fixturePromise, standingsPromise]);
+    const [br,pr,tbr,rr,fr,stdr,fdr] = await Promise.all([...corePromises, rosterPromise, fixturePromise, standingsPromise, fieldingPromise]);
     BAT=parseCSV(br); PIT=parseCSV(pr); TBAT=parseCSV(tbr);
     // Strip wrapping quotes that Google Sheets sometimes adds to the entire CSV
     const cleanCSV = s => { const t=s.trim(); return (t.startsWith('"')&&t.endsWith('"')) ? t.slice(1,-1).replace(/""/g,'"') : t; };
+    if(fdr && fdr.trim()) { FIELD=parseCSV(cleanCSV(fdr)); }
     if(rr && rr.trim()) { ROSTERS=parseCSV(cleanCSV(rr)); }
     if(fr && fr.trim()) { FIXTURES=parseCSV(cleanCSV(fr)); }
     if(stdr && stdr.trim()) { STANDINGS_DATA=parseCSV(cleanCSV(stdr)); }
@@ -1245,10 +1289,12 @@ async function loadAll() {
     const extras = [];
     if(ROSTERS.length)  extras.push(`${ROSTERS.length} roster entries`);
     if(FIXTURES.length) extras.push(`${FIXTURES.length} fixtures`);
+    if(FIELD.length)    extras.push(`${FIELD.length} fielding records`);
     const extraStr = extras.length ? ' · ' + extras.join(' · ') : '';
     $('stxt').textContent=`Live · Updated ${ts}`;
     $('bat-updated').textContent=`Last updated: ${ts}`;
     $('pit-updated').textContent=`Last updated: ${ts}`;
+    if($('field-updated')) $('field-updated').textContent=`Last updated: ${ts}`;
     init();
   } catch(e) {
     $('dot').className='dot err';
@@ -1262,10 +1308,15 @@ async function loadAll() {
 
 function init() {
   const teams=[...new Set(BAT.map(p=>p.Team).filter(Boolean))].sort();
-  ['bteam','pteam','cteam','pcteam'].forEach(id=>{
-    const s=$(id); while(s.options.length>1) s.remove(1);
+  ['bteam','pteam','cteam','pcteam','fteam'].forEach(id=>{
+    const s=$(id); if(!s) return; while(s.options.length>1) s.remove(1);
     teams.forEach(t=>{const o=document.createElement('option');o.value=t;o.textContent=t;s.appendChild(o);});
   });
+  // Fielding panel state
+  if(FIELD.length) {
+    $('field-loader').style.display='none'; $('field-content').style.display='block';
+    $('hc-field').textContent=`${FIELD.length} player records`;
+  }
   BAT.forEach(p=>{
     const pa=flt(p.AB)+flt(p.BB)+flt(p.HBP);
     p.BBpct=pa>0?(flt(p.BB)/pa)*100:0;
@@ -1309,8 +1360,9 @@ function init() {
     p.WAR=Math.round(Math.min(runsAboveRepl/PIT_RUN_WIN, maxWAR)*10)/10;
   });
 
-  bPg=0;pPg=0;cPg=0;pcPg=0;
+  bPg=0;pPg=0;cPg=0;pcPg=0;fPg=0;
   rBat();rPit();rCmp();rPCmp();rTGrid();rSlots();rPSlots();rLeaderboard();rTeamsBrowser();
+  if(FIELD.length) rField();
   // Update home card counts
   if($('hc-bat')) $('hc-bat').textContent = BAT.length + ' batters';
   if($('hc-pit')) $('hc-pit').textContent = PIT.length + ' pitchers';
@@ -1327,6 +1379,7 @@ function show(id) {
   const p=$('p-'+id),t=$('tab-'+id);if(p)p.classList.add('active');if(t)t.classList.add('active');
   // Tab-specific rendering
   if(id==='lavg'){rLAvg();}
+  if(id==='field'){rField();}
   if(id==='analytics'){
     // analytics tab loaded
   }
@@ -1401,6 +1454,40 @@ function rPit(){
     <td class="hl">${f2(p.ERA)}</td><td>${f2(p.WHIP)}</td><td>${f3(p.BAVG)}</td>
     <td style="font-weight:700;color:${p.WAR===null?'var(--text3)':flt(p.WAR)>=2?'#008044':flt(p.WAR)>=1?'#0057ff':flt(p.WAR)>=0?'var(--text2)':'#cc2200'}">${p.WAR===null?'—':((p.WAR>0?'+':'')+p.WAR)}</td>
     <td><button class="addbtn" onclick='addPCmp(${JSON.stringify({Name:p.Name,Team:p.Team,ERA:p.ERA,WHIP:p.WHIP,BAVG:p.BAVG,SO:p.SO,IP:p.IP,W:p.W,L:p.L,SV:p.SV,BB:p.BB,ER:p.ER,H:p.H,APP:p.APP})});show("pcmp")'>+ Compare</button></td>
+  </tr>`).join('');
+}
+
+}
+
+// ── Fielding table ──
+function fsby(col){
+  // Errors sort ascending (fewer = better), FPCT descending
+  if(fSort===col){ fDir*=-1; } else { fSort=col; fDir=(col==='E'||col==='PB')?1:-1; }
+  $('fsort').value=col; rField();
+}
+function fpg(d){fPg=Math.max(0,fPg+d);rField();}
+function rField(){
+  if(!FIELD.length) return;
+  const asc=fDir===1, q=($('fsrch')?$('fsrch').value:'').toLowerCase(), tm=($('fteam')?$('fteam').value:'');
+  fFil=FIELD.filter(p=>(!tm||p.Team===tm)&&(!q||p.Name.toLowerCase().includes(q)))
+       .sort((a,b)=>asc?flt(a[fSort])-flt(b[fSort]):flt(b[fSort])-flt(a[fSort]));
+  if(fPg*25>=fFil.length&&fPg>0)fPg=0;
+  const s=fPg*25,e=s+25,pg=fFil.slice(s,e);
+  if($('fpgi'))$('fpgi').textContent=`${fFil.length?s+1:0}–${Math.min(e,fFil.length)} of ${fFil.length}`;
+  if($('fcount'))$('fcount').textContent=`(${fFil.length} players)`;
+  const errCol=e=>flt(e)===0?'var(--green)':flt(e)<=2?'var(--amber)':'var(--red)';
+  const fCol=v=>{const n=flt(v);return n>=0.95?'var(--green)':n>=0.85?'var(--text)':'var(--amber)';};
+  if($('fbody'))$('fbody').innerHTML=pg.map((p,i)=>`<tr>
+    <td style="color:#bbb;font-size:10px">${s+i+1}</td>
+    <td><span class="pn">${p.Name}</span></td>
+    <td><span class="tm-badge">${p.Team}</span></td>
+    <td>${p.G}</td><td>${p.C||'—'}</td><td>${p.PO||'—'}</td><td>${p.A||'—'}</td>
+    <td style="font-weight:700;color:${errCol(p.E)}">${p.E||0}</td>
+    <td>${p.DP||'—'}</td>
+    <td class="hl" style="color:${fCol(p.FPCT)}">${p.FPCT||'—'}</td>
+    <td>${p.SBA||'—'}</td><td>${p.CSB||'—'}</td>
+    <td>${p.SBAP?flt(p.SBAP).toFixed(1)+'%':'—'}</td>
+    <td style="color:${flt(p.PB)>0?'var(--red)':'var(--text3)'}">${p.PB||0}</td>
   </tr>`).join('');
 }
 
