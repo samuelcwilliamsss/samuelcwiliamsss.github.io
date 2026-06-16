@@ -330,6 +330,7 @@ tr:hover td{background:#fafaf8}
     <button class="tab" onclick="show('tcmp')" id="tab-tcmp">Compare teams</button>
     <button class="tab" onclick="show('lavg')" id="tab-lavg">League averages</button>
     <button class="tab" onclick="show('analytics')" id="tab-analytics">Analytics</button>
+    <button class="tab" onclick="show('method')" id="tab-method">WAR Methodology</button>
   </div>
 
   <!-- BATTING -->
@@ -350,6 +351,7 @@ tr:hover td{background:#fafaf8}
       <div class="home-card" onclick="show('cteam')"><div class="home-card-title">Compare Teams</div><div class="home-card-sub">Up to 4 teams</div></div>
       <div class="home-card" onclick="show('lavg')"><div class="home-card-title">League Averages</div><div class="home-card-sub">Division-wide stats</div></div>
       <div class="home-card" onclick="show('analytics')"><div class="home-card-title">Analytics</div><div class="home-card-sub">Player similarity</div></div>
+      <div class="home-card" onclick="show('method')"><div class="home-card-title">WAR Methodology</div><div class="home-card-sub">How bWAR, pWAR &amp; dWAR are calculated</div></div>
     </div>
   </div>
 
@@ -378,7 +380,7 @@ tr:hover td{background:#fafaf8}
           <th onclick="sby('SLG')">SLG</th>
           <th onclick="sby('OPS')">OPS</th>
           <th onclick="sby('bWAR')">bWAR</th>
-          <th onclick="sby('dWAR')" title="Defensive WAR — errors above/below expected (TC≥15 to qualify)">dWAR</th>
+          <th onclick="sby('dWAR')" title="Defensive WAR — errors above/below expected (TC≥10 to qualify)">dWAR</th>
           <th onclick="sby('tWAR')" title="Total WAR = bWAR + pWAR + dWAR">tWAR</th>
           <th onclick="sby('WARp4')" title="WAR per 4 plate appearances — adjusts for sample size (4 PA ≈ one game in this format)">WAR/PA</th>
           <th></th>
@@ -451,7 +453,7 @@ tr:hover td{background:#fafaf8}
           <th onclick="fsby('CSB')" title="Caught Stealing (as fielder/catcher)">CS</th>
           <th onclick="fsby('SBAP')" title="SB% Against">SB%</th>
           <th onclick="fsby('PB')" title="Passed Balls">PB</th>
-          <th onclick="fsby('dWAR')" title="Defensive WAR (TC≥15 to qualify)" class="s">dWAR</th>
+          <th onclick="fsby('dWAR')" title="Defensive WAR (TC≥10 to qualify)" class="s">dWAR</th>
         </tr></thead>
         <tbody id="fbody"></tbody>
       </table></div>
@@ -653,6 +655,140 @@ tr:hover td{background:#fafaf8}
       <div id="lavg-teams"></div>
     </div>
   </div>
+  <!-- METHODOLOGY -->
+  <div id="p-method" class="panel">
+    <div style="max-width:780px">
+
+      <div style="margin-bottom:1.75rem">
+        <div style="font-size:18px;font-weight:800;letter-spacing:-.02em;margin-bottom:4px">WAR Methodology</div>
+        <div style="font-size:12px;color:var(--text3);line-height:1.6">
+          BBF Scout uses a custom Wins Above Replacement (WAR) model calibrated for Division 5 2026. 
+          These are estimates — not official statistics — designed to give a rough sense of each player's total contribution relative to a replacement-level player.
+          All baselines are <strong>frozen at the 2026 season halfway point</strong> so rankings don't shift as the season progresses.
+        </div>
+      </div>
+
+      <!-- bWAR -->
+      <div style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;margin-bottom:1rem">
+        <div style="padding:10px 14px;background:var(--accent-bg);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px">
+          <span style="font-size:15px;font-weight:800;color:var(--accent)">bWAR</span>
+          <span style="font-size:12px;color:var(--accent);font-weight:600">Batting WAR</span>
+          <span style="font-size:11px;color:var(--text3);font-weight:500;margin-left:auto">Minimum: 10 AB</span>
+        </div>
+        <div style="padding:12px 14px">
+          <div style="font-size:12px;line-height:1.7;color:var(--text2);margin-bottom:10px">
+            Measures a batter's offensive contribution above a replacement-level player. Combines weighted on-base and slugging with baserunning value, then subtracts what a replacement player would produce.
+          </div>
+          <div style="background:#fafaf8;border:1px solid var(--border2);border-radius:var(--radius-sm);padding:10px 12px;font-family:monospace;font-size:11.5px;line-height:1.9;color:var(--text)">
+            wRAA = ((OBP − lgOBP) × 1.1 + (SLG − lgSLG) × 1.0) × (AB / lgAB)<br>
+            BsR  = (SB × 0.08) − (CS × 0.45)<br>
+            repl = ((replOBP − lgOBP) × 1.1 + (replSLG − lgSLG) × 1.0) × (AB / lgAB)<br>
+            <strong>bWAR = (wRAA + BsR − repl) / WAR_RUN_WIN</strong>
+          </div>
+          <div style="margin-top:10px">
+            <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Frozen baselines (set mid-season 2026)</div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:6px">
+              ${[['lgOBP','0.594'],['lgSLG','0.574'],['lgAVG','0.457'],['lgAB (avg)','15.8'],['replOBP','0.517 (87% of lg)'],['replSLG','0.499 (87% of lg)'],['WAR_RUN_WIN','2.5']].map(([k,v])=>`<div style="background:#f5f5f2;border-radius:5px;padding:5px 8px"><div style="font-size:9px;font-weight:700;color:var(--text3)">${k}</div><div style="font-size:12px;font-weight:700">${v}</div></div>`).join('')}
+            </div>
+          </div>
+          <div style="margin-top:8px;font-size:11px;color:var(--text3)">
+            OBP weighted 1.1× vs SLG 1.0× — reflects this division's high-walk environment where getting on base is slightly more valuable than extra bases. SB valued at 0.08 runs (conservative given easy scoring environment). CS penalised at 0.45 runs.
+          </div>
+        </div>
+      </div>
+
+      <!-- pWAR -->
+      <div style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;margin-bottom:1rem">
+        <div style="padding:10px 14px;background:var(--accent2-bg);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px">
+          <span style="font-size:15px;font-weight:800;color:var(--accent2)">pWAR</span>
+          <span style="font-size:12px;color:var(--accent2);font-weight:600">Pitching WAR</span>
+          <span style="font-size:11px;color:var(--text3);font-weight:500;margin-left:auto">Minimum: 8 IP</span>
+        </div>
+        <div style="padding:12px 14px">
+          <div style="font-size:12px;line-height:1.7;color:var(--text2);margin-bottom:10px">
+            Uses an ERA+ style formula where <strong>quality is the primary driver and innings pitched is secondary</strong>. A pitcher with half the ERA of the league average in 15 innings outranks one with an average ERA in 25 innings. This corrects for the short-game, short-season format where volume alone shouldn't dominate.
+          </div>
+          <div style="background:#fafaf8;border:1px solid var(--border2);border-radius:var(--radius-sm);padding:10px 12px;font-family:monospace;font-size:11.5px;line-height:1.9;color:var(--text)">
+            ERA+     = min(lgERA / ERA, 4.0)  <span style="color:var(--text3);font-family:sans-serif;font-size:10px">← capped at 4× to prevent extreme outliers</span><br>
+            replERA+ = lgERA / replERA = 0.932<br>
+            <strong>pWAR = (ERA+ − replERA+) × (IP / avgIP) × 1.2</strong>
+          </div>
+          <div style="margin-top:10px">
+            <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Frozen baselines (set mid-season 2026)</div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:6px">
+              ${[['lgERA','27.53'],['replERA','29.53 (lg+2)'],['replERA+','0.932'],['avgIP','18'],['ERA+ cap','4.0×'],['scale','1.2'],['min IP','8']].map(([k,v])=>`<div style="background:#fff4ee;border-radius:5px;padding:5px 8px"><div style="font-size:9px;font-weight:700;color:var(--text3)">${k}</div><div style="font-size:12px;font-weight:700">${v}</div></div>`).join('')}
+            </div>
+          </div>
+          <div style="margin-top:8px;font-size:11px;color:var(--text3)">
+            ERA+ cap of 4.0 means a pitcher with ERA of 6.9 (4× better than lgERA 27.53) hits the ceiling — preventing freakishly low-ERA pitchers in small samples from generating unrealistically large pWAR. Minimum 8 IP covers genuine relievers while excluding position players who threw in emergencies.
+          </div>
+        </div>
+      </div>
+
+      <!-- dWAR -->
+      <div style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;margin-bottom:1rem">
+        <div style="padding:10px 14px;background:var(--green-bg);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px">
+          <span style="font-size:15px;font-weight:800;color:var(--green)">dWAR</span>
+          <span style="font-size:12px;color:var(--green);font-weight:600">Defensive WAR</span>
+          <span style="font-size:11px;color:var(--text3);font-weight:500;margin-left:auto">Minimum: 10 TC</span>
+        </div>
+        <div style="padding:12px 14px">
+          <div style="font-size:12px;line-height:1.7;color:var(--text2);margin-bottom:10px">
+            Measures fielding contribution based on errors above or below the league average rate. In this high-walk division, making routine plays has genuine value — more baserunners means more fielding opportunities matter. Scorekeeping is conservative (errors only called when clear), so the error rate reflects real defensive lapses.
+          </div>
+          <div style="background:#fafaf8;border:1px solid var(--border2);border-radius:var(--radius-sm);padding:10px 12px;font-family:monospace;font-size:11.5px;line-height:1.9;color:var(--text)">
+            expE  = TC × lgErrRate  <span style="color:var(--text3);font-family:sans-serif;font-size:10px">← expected errors at league rate</span><br>
+            errΔ  = E − expE        <span style="color:var(--text3);font-family:sans-serif;font-size:10px">← errors above/below average</span><br>
+            <strong>dWAR = −(errΔ × runsPerErr) / WAR_RUN_WIN</strong>
+          </div>
+          <div style="margin-top:10px">
+            <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Frozen baselines (set mid-season 2026)</div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:6px">
+              ${[['lgErrRate','0.1347 (1 per 7.4 TC)'],['runsPerErr','0.5'],['WAR_RUN_WIN','2.5'],['min TC','10'],['total TC (lg)','2,539'],['total E (lg)','342']].map(([k,v])=>`<div style="background:#edf7f2;border-radius:5px;padding:5px 8px"><div style="font-size:9px;font-weight:700;color:var(--text3)">${k}</div><div style="font-size:12px;font-weight:700">${v}</div></div>`).join('')}
+            </div>
+          </div>
+          <div style="margin-top:8px;font-size:11px;color:var(--text3)">
+            Position weighting is not applied — positions are fluid in this division and tracking per-position data isn't practical. Below 10 TC the sample is too small to be meaningful, so dWAR shows — and contributes 0 to tWAR. The 0.5 runs-per-error value is conservative compared to MLB models (~0.75) reflecting that not every error directly leads to a run in a high-scoring environment.
+          </div>
+        </div>
+      </div>
+
+      <!-- tWAR -->
+      <div style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;margin-bottom:1.5rem">
+        <div style="padding:10px 14px;background:#f5f0ff;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px">
+          <span style="font-size:15px;font-weight:800;color:#7c3aed">tWAR</span>
+          <span style="font-size:12px;color:#7c3aed;font-weight:600">Total WAR</span>
+        </div>
+        <div style="padding:12px 14px">
+          <div style="font-size:12px;line-height:1.7;color:var(--text2);margin-bottom:10px">
+            The sum of all components. Because nearly all players in this division both bat and pitch, tWAR reflects total contribution across all three dimensions. A two-way ace who also fields well will naturally accumulate higher tWAR than a specialist.
+          </div>
+          <div style="background:#fafaf8;border:1px solid var(--border2);border-radius:var(--radius-sm);padding:10px 12px;font-family:monospace;font-size:11.5px;line-height:1.9;color:var(--text)">
+            <strong>tWAR = bWAR + pWAR + dWAR</strong><br>
+            <span style="color:var(--text3);font-family:sans-serif;font-size:10px">Components that don't qualify (below threshold) contribute 0, not a penalty.</span>
+          </div>
+          <div style="margin-top:8px;font-size:11px;color:var(--text3)">
+            See the <span style="color:var(--accent);cursor:pointer;font-weight:600" onclick="show('leaders');setLbMode('twar')">Total WAR leaderboard</span> for the full ranked table, sortable by each component.
+          </div>
+        </div>
+      </div>
+
+      <!-- Limitations -->
+      <div style="border:1px solid var(--amber-bg);border-radius:var(--radius);background:var(--amber-bg);padding:12px 14px">
+        <div style="font-size:11px;font-weight:700;color:var(--amber);margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em">⚠ Limitations &amp; caveats</div>
+        <ul style="font-size:11px;color:var(--text2);line-height:1.8;padding-left:1.2rem;margin:0">
+          <li>These WAR values are <strong>not comparable to MLB WAR</strong> — the scale and baselines are calibrated for Division 5 2026 specifically.</li>
+          <li>Small sample sizes mean individual values can be noisy, especially early in the season. Treat rankings as directional rather than precise.</li>
+          <li>No park factors or opponent adjustments are applied.</li>
+          <li>Pitching WAR does not account for fielding behind the pitcher (defence-independent metrics like FIP are not available).</li>
+          <li>Fielding WAR uses errors only — range, positioning, and arm strength are not captured.</li>
+          <li>Baselines are frozen mid-season and will be recalibrated for 2027.</li>
+        </ul>
+      </div>
+
+    </div>
+  </div>
+
 </div>
 
 <!-- PLAYER CARD MODAL -->
@@ -747,7 +883,7 @@ const WAR_RUN_WIN  = 2.5;  // scaled for 24-game season (MLB uses 9.5 over 162)
 const WAR_PIT_RUN_WIN = 12; // kept for reference — pWAR now uses ERA+ formula
 const WAR_LG_ERR_RATE = 0.1347; // frozen at 2026 season halfway (1 error per 7.4 chances)
 const WAR_ERR_RUN    = 0.5;   // runs per error above average (conservative for high-walk env)
-const WAR_FIELD_MIN_TC = 15;  // minimum TC to qualify for dWAR
+const WAR_FIELD_MIN_TC = 10;  // minimum TC to qualify for dWAR
 // pWAR ERA+ constants (frozen at 2026 season halfway)
 const WAR_PIT_LG_ERA   = 27.53; // league average ERA
 const WAR_PIT_REPL_ERA = 29.53; // replacement level ERA (lgERA + 2)
@@ -938,7 +1074,7 @@ function rWAR() {
   $('war-content').innerHTML = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">'
     + renderList(top10bat, 'Batting WAR')
     + renderList(top10pit, 'Pitching WAR')
-    + '</div><div style="font-size:10px;color:var(--text3);margin-top:8px;border-top:1px solid var(--border2);padding-top:6px">bWAR: wRAA (OBP×1.1 + SLG×1.0) + BsR (SB×0.08 − CS×0.45) vs frozen mid-season baseline · pWAR: ERA+ style (quality primary, IP secondary), IP≥8, ERA+ capped at 4× lgERA · dWAR: errors vs expected at frozen lgErrRate=0.1347, TC≥15 · See Total WAR tab for combined rankings</div>';
+    + '</div><div style="font-size:10px;color:var(--text3);margin-top:8px;border-top:1px solid var(--border2);padding-top:6px">bWAR: wRAA (OBP×1.1 + SLG×1.0) + BsR (SB×0.08 − CS×0.45) vs frozen mid-season baseline · pWAR: ERA+ style (quality primary, IP secondary), IP≥8, ERA+ capped at 4× lgERA · dWAR: errors vs expected at frozen lgErrRate=0.1347, TC≥10 · See Total WAR tab for combined rankings</div>';
 }
 
 // ── Team scatter (Offence vs Defence) ──
@@ -1921,7 +2057,7 @@ function rTWARLeaderboard(){
 
   const out = `<div>
     <div style="font-size:10px;color:var(--text3);margin-bottom:.75rem;padding:.5rem .75rem;background:#fafaf8;border:1px solid var(--border);border-radius:var(--radius-sm)">
-      <strong>tWAR</strong> = bWAR (batting) + pWAR (pitching, IP≥8, ERA+ formula) + dWAR (fielding, TC≥15). Click any column header to sort.
+      <strong>tWAR</strong> = bWAR (batting) + pWAR (pitching, IP≥8, ERA+ formula) + dWAR (fielding, TC≥10). Click any column header to sort.
     </div>
     <div class="tw"><table style="min-width:400px">
       <thead><tr>
