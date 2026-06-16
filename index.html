@@ -1583,6 +1583,7 @@ function rBat(){
     <td>${fpct(p.BBpct)}</td><td>${fpct(p.Kpct)}</td>
     <td class="hl">${f3(p.AVG)}</td><td>${f3(p.OBP)}</td><td>${f3(p.SLG)}</td><td>${f3(p.OPS)}</td>
     <td style="font-weight:700;color:${p.bWAR===null?'var(--text3)':flt(p.bWAR)>=2?'#008044':flt(p.bWAR)>=1?'#0057ff':flt(p.bWAR)>=0?'var(--text2)':'#cc2200'}">${p.bWAR===null?'—':((p.bWAR>0?'+':'')+p.bWAR)}</td>
+    <td style="color:${p.WARp4===null?'var(--text3)':flt(p.WARp4)>=0.2?'#008044':flt(p.WARp4)>=0.1?'#0057ff':flt(p.WARp4)>=0?'var(--text2)':'#cc2200'};font-size:11px">${p.WARp4===null?'—':((p.WARp4>0?'+':'')+p.WARp4)}</td>
     <td><button class="addbtn" onclick='addCmp(${JSON.stringify({Name:p.Name,Team:p.Team,AVG:p.AVG,OBP:p.OBP,SLG:p.SLG,OPS:p.OPS,H:p.H,HR:p.HR,RBI:p.RBI,R:p.R,SB:p.SB,BB:p.BB,SO:p.SO,AB:p.AB,BBpct:p.BBpct,Kpct:p.Kpct})});show("cmp")'>+ Compare</button></td>
   </tr>`).join('');
 }
